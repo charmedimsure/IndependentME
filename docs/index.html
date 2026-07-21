@@ -338,6 +338,9 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
     <p class="note" style="margin-top:8px" id="voiceState"></p>
     <button class="btn ghost" style="margin-top:16px" id="askNotif">Turn on notifications</button>
     <button class="btn" style="margin-top:12px" id="installApp">Add to the home screen</button>
+    <button class="btn ghost" style="margin-top:10px" id="diag">Check what's working</button>
+    <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
+    <pre id="diagOut" class="note" style="white-space:pre-wrap;margin-top:10px"></pre>
     <p class="note" style="margin-top:12px">Reminders sound while IndependentME is on screen. Leave the app open and the tablet plugged in. For anything that truly cannot be missed, set a backup alarm in the tablet's Clock app too.</p>
   </div>
 </div>
@@ -1512,9 +1515,50 @@ document.addEventListener('click', e=>{
     speak('Hello Karelynn. This is how I will talk to you.');
     return;
   }
+  if(t.id==='forceUpdate'){
+    t.textContent='Updating…';
+    (async()=>{
+      try{
+        if('serviceWorker' in navigator){
+          const rs=await navigator.serviceWorker.getRegistrations();
+          for(const r of rs){ if(r.active) r.active.postMessage('wipe'); await r.unregister(); }
+        }
+        if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+      }catch(e){}
+      location.replace(location.pathname+'?v='+Date.now());
+    })();
+    return;
+  }
+  if(t.id==='diag'){
+    const out=document.getElementById('diagOut');
+    out.textContent='Checking…';
+    const lines=[];
+    lines.push('Version: '+APP_VERSION);
+    lines.push('Address: '+location.href);
+    lines.push('Standalone: '+(matchMedia('(display-mode: standalone)').matches?'yes, already installed':'no'));
+    lines.push('Install prompt offered: '+(installPrompt?'yes':'not yet'));
+    lines.push('Speech voices: '+(('speechSynthesis' in window)?speechSynthesis.getVoices().length:'not supported'));
+    lines.push('Notifications: '+(('Notification' in window)?Notification.permission:'not supported'));
+    lines.push('Camera API: '+((navigator.mediaDevices&&navigator.mediaDevices.getUserMedia)?'available':'missing'));
+    lines.push('Worker set: '+(API||'none')+' / '+(HOUSE||'none'));
+    lines.push('Connected: '+(online?'yes':'no'));
+    lines.push('Tasks loaded: '+tasks().length);
+    out.textContent=lines.join('\n');
+
+    Promise.all([
+      fetch('manifest.json').then(r=>'Manifest: '+(r.ok?'found':'HTTP '+r.status)).catch(e=>'Manifest: failed'),
+      ('serviceWorker' in navigator)
+        ? navigator.serviceWorker.getRegistration().then(r=>'Service worker: '+(r?'registered':'not registered'))
+        : Promise.resolve('Service worker: not supported'),
+      API ? fetch(API.replace(/\/$/,'')).then(r=>'Worker reachable: '+(r.ok?'yes':'HTTP '+r.status)).catch(()=>'Worker reachable: no')
+          : Promise.resolve('Worker reachable: no address set')
+    ]).then(extra=>{ out.textContent=lines.concat(extra).join('\n'); });
+    return;
+  }
   if(t.id==='installApp'){
     if(installPrompt){ installPrompt.prompt(); installPrompt=null; }
-    else alert('Use the Chrome menu, then Add to Home screen. If that is missing, this page is already installed.');
+    else if(matchMedia('(display-mode: standalone)').matches) alert('This is already installed — you are running it from the home screen now.');
+    else alert('Chrome has not offered the install prompt yet.\n\nUse the Chrome menu (three dots), then "Install app" or "Add to Home screen".\n\nIf that is missing, tap "Check what\'s working" below and tell Aimee what it says.');
     return;
   }
   if(t.id==='askNotif'){
@@ -1575,6 +1619,7 @@ if('serviceWorker' in navigator){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
+const APP_VERSION='2026-07-21-d';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; });
 

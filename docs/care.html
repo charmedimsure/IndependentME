@@ -576,6 +576,8 @@ function viewSetup(){
   <div class="panel"><h3>This phone</h3>
     <button class="btn ghost" id="askNotif">Turn on notifications</button>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
+    <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
+    <p class="note" style="margin-top:10px">Version 2026-07-21-d</p>
   </div>`;
 }
 
@@ -904,6 +906,18 @@ document.addEventListener('click',async e=>{
     CFG.helpFallbackMinutes=+document.getElementById('sFallback').value;
     CFG.nudgeTo=document.getElementById('sNudge').value;
     await saveConfig(t); return;
+  }
+  if(t.id==='forceUpdate'){
+    t.textContent='Updating…';
+    try{
+      if('serviceWorker' in navigator){
+        const rs=await navigator.serviceWorker.getRegistrations();
+        for(const r of rs){ if(r.active) r.active.postMessage('wipe'); await r.unregister(); }
+      }
+      if('caches' in window){ const ks=await caches.keys(); await Promise.all(ks.map(k=>caches.delete(k))); }
+    }catch(e){}
+    location.replace(location.pathname+'?v='+Date.now());
+    return;
   }
   if(t.id==='installApp'){
     if(installPrompt){ installPrompt.prompt(); installPrompt=null; }
