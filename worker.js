@@ -280,6 +280,34 @@ export default {
           return json({ ok: true });
         }
 
+        /* ---------- clearing out old messages ---------- */
+        case '/purge': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          const { ids, before, all } = body;
+
+          if (all) {
+            await env.DB.prepare('DELETE FROM messages WHERE code = ?').bind(house).run();
+            await env.DB.prepare('DELETE FROM photos WHERE code = ?').bind(house).run();
+          } else if (Array.isArray(ids) && ids.length) {
+            const marks = ids.map(() => '?').join(',');
+            await env.DB.prepare(`DELETE FROM messages WHERE code = ? AND id IN (${marks})`)
+              .bind(house, ...ids.map(Number)).run();
+          } else if (before) {
+            await env.DB.prepare('DELETE FROM messages WHERE code = ? AND at < ?').bind(house, Number(before)).run();
+            await env.DB.prepare('DELETE FROM photos WHERE code = ? AND at < ?').bind(house, Number(before)).run();
+          } else {
+            return json({ error: 'Nothing specified' }, 400);
+          }
+          return json({ ok: true });
+        }
+
+        case '/purge-photo': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          if (!body.id) return json({ error: 'Missing id' }, 400);
+          await env.DB.prepare('DELETE FROM photos WHERE code = ? AND id = ?').bind(house, Number(body.id)).run();
+          return json({ ok: true });
+        }
+
         /* ---------- caregiver replies ---------- */
         case '/reply': {
           if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
@@ -354,6 +382,13 @@ export default {
       const cfg = JSON.parse(h.config || '{}');
       await env.DB.prepare('DELETE FROM signal WHERE code = ? AND at < ?')
         .bind(h.code, Date.now() - 3600000).run();
+
+      // Optional housekeeping so the thread doesn't grow forever
+      if (cfg.keepDays) {
+        const cutoff = Date.now() - cfg.keepDays * 86400000;
+        await env.DB.prepare('DELETE FROM messages WHERE code = ? AND at < ?').bind(h.code, cutoff).run();
+        await env.DB.prepare('DELETE FROM photos   WHERE code = ? AND at < ?').bind(h.code, cutoff).run();
+      }
 
       const houseGrace = cfg.helpFallbackMinutes != null ? cfg.helpFallbackMinutes : 10;
       if (!houseGrace) continue;

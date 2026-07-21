@@ -266,6 +266,13 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 .pic svg,.tico svg,.spic svg,.oitem .pic svg,.emojis svg,.apic svg{width:62%;height:62%;color:currentColor}
 .spic svg{width:58%;height:58%}
+
+.installbar{position:fixed;left:16px;right:16px;bottom:110px;z-index:55;background:var(--surface);
+  border-radius:24px;padding:18px 20px;display:flex;align-items:center;gap:16px;box-shadow:var(--shadow)}
+.installbar b{font-family:var(--display);font-size:21px;display:block}
+.installbar span{font-size:14px;font-weight:700;color:var(--ink-soft)}
+.installbar .go{background:var(--ink);color:var(--sky-1);border-radius:16px;padding:15px 22px;font-weight:800;font-size:17px;flex:none}
+.installbar .x{background:transparent;font-size:24px;padding:8px 6px;opacity:.4;flex:none}
 </style>
 </head>
 <body data-part="morning">
@@ -296,6 +303,11 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
   </div>
 </nav>
 
+<div class="installbar hide" id="installbar">
+  <div style="flex:1"><b>Add to this tablet</b><span>So it opens like an app</span></div>
+  <button class="go" id="ibGo">Add</button>
+  <button class="x" id="ibNo">✕</button>
+</div>
 <div class="steps hide" id="steps"></div>
 <div class="warnbar hide" id="warnbar"></div>
 <div class="ask hide" id="ask"></div>
@@ -1368,8 +1380,11 @@ function freeNow(p){
 
 function reachable(){
   const all=(CFG&&CFG.contacts)||[];
+  if(!all.length) return [];
   const free=all.filter(p=>freeNow(p) || p.fallback);
-  return free.length ? free : all.filter(p=>p.fallback).concat(free).slice(0,4);
+  // Better to offer someone who's busy than to offer nobody. She should never
+  // reach a screen with no faces on it.
+  return free.length ? free : all;
 }
 
 /* ---------- messages ---------- */
@@ -1515,6 +1530,12 @@ document.addEventListener('click', e=>{
     speak('Hello Karelynn. This is how I will talk to you.');
     return;
   }
+  if(t.closest('#ibNo')){ LS.set('noInstall',true); document.getElementById('installbar').classList.add('hide'); return; }
+  if(t.closest('#ibGo')){
+    if(installPrompt){ installPrompt.prompt(); installPrompt=null; document.getElementById('installbar').classList.add('hide'); }
+    else alert('Chrome menu (three dots), then "Install app" or "Add to Home screen".');
+    return;
+  }
   if(t.id==='forceUpdate'){
     t.textContent='Updating…';
     (async()=>{
@@ -1619,9 +1640,20 @@ if('serviceWorker' in navigator){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-21-d';
+const APP_VERSION='2026-07-21-f';
 let installPrompt=null;
-window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; });
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
+window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
+
+/* Only ever shown before it's installed, and only when it isn't already
+   running from the home screen. Karelynn never sees it after setup day. */
+function showInstallBar(){
+  if(matchMedia('(display-mode: standalone)').matches) return;
+  if(LS.get('noInstall',false)) return;
+  const el=document.getElementById('installbar');
+  if(el) el.classList.remove('hide');
+}
+setTimeout(showInstallBar, 3000);
 
 /* ============================================================
    Speech

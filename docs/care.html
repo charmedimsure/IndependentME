@@ -109,6 +109,13 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 .pic svg,.tico svg,.spic svg,.oitem .pic svg,.emojis svg,.apic svg{width:62%;height:62%;color:currentColor}
 .spic svg{width:58%;height:58%}
+
+.installbar{position:fixed;left:12px;right:12px;bottom:84px;z-index:55;background:var(--amber);color:#22201C;
+  border-radius:18px;padding:14px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 14px 34px rgba(0,0,0,.45)}
+.installbar b{font-family:'Bricolage Grotesque',sans-serif;font-size:16px;display:block}
+.installbar span{font-size:12.5px;font-weight:700;opacity:.75}
+.installbar .go{background:#22201C;color:var(--amber);border-radius:12px;padding:11px 16px;font-weight:800;font-size:14px;flex:none}
+.installbar .x{background:transparent;color:#22201C;font-size:20px;padding:6px 4px;opacity:.55;flex:none}
 </style>
 </head>
 <body>
@@ -149,6 +156,11 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 .callwrap .bar{position:absolute;left:0;right:0;bottom:0;padding:20px calc(20px + env(safe-area-inset-bottom));display:flex;justify-content:center}
 .callwrap .hang{background:var(--miss);color:#fff;border-radius:40px;padding:17px 40px;font-weight:800;font-size:18px}
 </style>
+<div class="installbar hide" id="installbar">
+  <div style="flex:1"><b>Add Care to your phone</b><span>Opens like an app, no browser bar</span></div>
+  <button class="go" id="ibGo">Add</button>
+  <button class="x" id="ibNo">✕</button>
+</div>
 <div class="lightbox hide" id="lightbox"></div>
 <div class="callwrap hide" id="callwrap"></div>
 <script>
@@ -191,7 +203,7 @@ let API=LS.get('api',''), HOUSE=LS.get('house',''), CARE=LS.get('care',''), ME=L
 })();
 let CFG=LS.get('config',null), DONE=[], MSGS=[], WEEK=[], PHOTOS=[];
 let online=false, tab='today', lastCount=0;
-let savedAt=LS.get('savedAt',0), saving=false;
+let savedAt=LS.get('savedAt',0), saving=false, TIDY=false;
 
 const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const D3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -221,7 +233,7 @@ function effT(t){
 const dueOn=(t,dow)=>t.freq==='daily'||(t.days||[]).includes(dow);
 
 const blank=()=>({
-  name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8,
+  name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8, keepDays:30,
   events:[
     {id:uid(),title:'Day service',icon:'🚐',photo:null,kind:'weekly',days:[2,3,4],from:'08:45',to:'15:00',warn:20,big:true,away:true,
      items:[{icon:'🎨',label:'activities'},{icon:'🍽️',label:'lunch there'}],note:'Home by three.'}
@@ -430,20 +442,29 @@ function viewMsgs(){
       <button class="btn" style="margin-top:11px" id="sendBtn">Send to the tablet</button>
       <p class="note" style="margin-top:10px">It arrives on her screen with a chime and is read out loud, so it works whether or not she reads it.</p>
     </div>
-    <div class="panel"><h3>History</h3>${
+    <div class="panel">
+      <h3 style="display:flex;justify-content:space-between;align-items:center">History
+        <button style="font-size:12px;letter-spacing:.06em;color:var(--amber)" id="tidyToggle">${TIDY?'Done':'Tidy up'}</button>
+      </h3>
+      ${TIDY?`<div class="quick" style="margin-bottom:14px">
+        <button data-purge="7">Delete older than a week</button>
+        <button data-purge="30">Delete older than a month</button>
+        <button data-purge="all" style="color:var(--miss);border-color:var(--miss)">Delete everything</button>
+      </div>`:''}
+      ${
       MSGS.length ? MSGS.slice().reverse().map(m=>
         m.dir==='alert'
         ? `<div class="msg from"><div class="av">${m.icon||'⏰'}</div><div>
              <div class="b ${m.seen?'':'unseen'}" style="background:${m.icon==='🆘'?'rgba(232,96,76,.16);color:var(--miss)':'rgba(242,179,61,.14);color:var(--warn)'}">${esc(m.body)}</div>
              <div class="when">${m.who?'she asked '+esc(m.who):'everyone'} · ${clock(m.at)}${m.ack?' · '+esc(m.ack)+' has it':''}</div>
              ${(m.icon==='🆘'&&!m.ack)?`<button class="btn" style="margin-top:8px;padding:10px 14px;font-size:14px;width:auto" data-ack="${m.id}">I've got this</button>`:''}
-             </div></div>`
+             </div>${TIDY?`<button class="x" style="background:transparent;color:var(--miss);font-size:18px;padding:4px 8px" data-del="${m.id}">✕</button>`:''}</div>`
         : m.dir==='out'
         ? `<div class="msg from"><div class="av">${m.icon||'💬'}</div><div>
              <div class="b ${m.seen?'':'unseen'}">${esc(m.body)}</div>
-             <div class="when">to ${esc(m.who||'')} · ${clock(m.at)}</div></div></div>`
+             <div class="when">to ${esc(m.who||'')} · ${clock(m.at)}</div></div>${TIDY?`<button class="x" style="background:transparent;color:var(--miss);font-size:18px;padding:4px 8px" data-del="${m.id}">✕</button>`:''}</div>`
         : `<div class="msg to"><div class="av">↩︎</div><div>
-             <div class="b">${esc(m.body)}</div><div class="when">${esc(m.who||'someone')} · ${clock(m.at)}</div></div></div>`
+             <div class="b">${esc(m.body)}</div><div class="when">${esc(m.who||'someone')} · ${clock(m.at)}</div></div>${TIDY?`<button class="x" style="background:transparent;color:var(--miss);font-size:18px;padding:4px 8px" data-del="${m.id}">✕</button>`:''}</div>`
       ).join('') : '<div class="empty">No messages yet.</div>'}
     </div>`;
 }
@@ -487,6 +508,13 @@ function viewSetup(){
     <label class="f">How fast she's spoken to</label>
     <select id="sRate">${[[0.6,'Very slow'],[0.7,'Slow'],[0.8,'Steady'],[0.9,'Normal']].map(([v,l])=>`<option value="${v}" ${((CFG&&CFG.speechRate)||0.8)===v?'selected':''}>${l}</option>`).join('')}</select>
     <p class="note" style="margin-top:8px">Hearing loss is common with Down syndrome and often goes unnoticed. If she asks people to repeat things, slow this down and check the tablet volume.</p>
+
+    <label class="f">Keep messages for</label>
+    <select id="sKeep">
+      <option value="0" ${!(CFG&&CFG.keepDays)?'selected':''}>Forever</option>
+      ${[7,30,90].map(n=>`<option value="${n}" ${(CFG&&CFG.keepDays)===n?'selected':''}>${n} days</option>`).join('')}
+    </select>
+    <p class="note" style="margin-top:8px">Anything older is tidied away on its own overnight. Photos go with it.</p>
 
     <label class="f">Phone alerts (ntfy topic)</label>
     <input id="sNtfy" value="${esc((CFG&&CFG.ntfy)||'')}" placeholder="karelynn-msgs-9x4f" autocapitalize="off" spellcheck="false">
@@ -555,6 +583,12 @@ function viewSetup(){
   </div>
 
   <div class="panel"><h3>People she can message</h3>
+    ${(CFG&&CFG.contacts||[]).length && !(CFG.contacts||[]).some(c=>c.fallback)
+      ? `<div style="background:rgba(242,179,61,.14);color:var(--warn);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;line-height:1.5">
+           Nobody is marked <b>always shown</b>. During everyone's busy hours she'd be offered whoever is left, which may not be who you'd want. Open your own entry and turn it on.</div>`
+      : ''}
+    ${(CFG&&CFG.contacts||[]).some(c=>c.fallback && !careFree(c))
+      ? `<div class="note" style="margin-bottom:12px">Someone marked always shown is inside their busy hours right now. She'll still see them.</div>` : ''}
     ${(CFG&&CFG.contacts||[]).map(c=>`
       <div class="trow"><div class="tico" style="border-radius:50%">${c.photo?`<img src="${c.photo}">`:icoHTML(c.icon)}</div>
       <div class="tmain"><div class="tname">${esc(c.name)}</div>
@@ -577,7 +611,7 @@ function viewSetup(){
     <button class="btn ghost" id="askNotif">Turn on notifications</button>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-21-d</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-21-f</p>
   </div>`;
 }
 
@@ -887,6 +921,7 @@ document.addEventListener('click',async e=>{
     CFG.name=document.getElementById('sName').value.trim();
     CFG.ntfy=document.getElementById('sNtfy').value.trim();
     CFG.speechRate=parseFloat(document.getElementById('sRate').value);
+    CFG.keepDays=+document.getElementById('sKeep').value||0;
     await saveConfig(t); return;
   }
   if(t.id==='saveMe'){ ME=document.getElementById('sMe').value; LS.set('me',ME); render(); return; }
@@ -919,6 +954,30 @@ document.addEventListener('click',async e=>{
     location.replace(location.pathname+'?v='+Date.now());
     return;
   }
+  if(t.id==='tidyToggle'){ TIDY=!TIDY; render(); return; }
+  const dl=t.closest('[data-del]');
+  if(dl){
+    try{ await post('/purge',{ids:[+dl.dataset.del]}); await pull(); toast('Deleted'); }
+    catch(e){ alert(e.message); }
+    return;
+  }
+  const pg=t.closest('[data-purge]');
+  if(pg){
+    const v=pg.dataset.purge;
+    const label = v==='all' ? 'every message and photo' : 'messages older than '+(v==='7'?'a week':'a month');
+    if(!confirm('Delete '+label+'? This cannot be undone.')) return;
+    try{
+      await post('/purge', v==='all' ? {all:true} : {before:Date.now()-(+v)*86400000});
+      await pull(); toast('Cleared');
+    }catch(e){ alert(e.message); }
+    return;
+  }
+  if(t.id==='ibNo'){ LS.set('noInstall',true); document.getElementById('installbar').classList.add('hide'); return; }
+  if(t.id==='ibGo'){
+    if(installPrompt){ installPrompt.prompt(); installPrompt=null; document.getElementById('installbar').classList.add('hide'); }
+    else alert('Use your browser menu, then "Install app" or "Add to Home screen".');
+    return;
+  }
   if(t.id==='installApp'){
     if(installPrompt){ installPrompt.prompt(); installPrompt=null; }
     else alert('Use your browser menu, then Add to Home screen.');
@@ -939,8 +998,16 @@ document.addEventListener('click',async e=>{
       const r=await fetch(API.replace(/\/$/,'')+'/photo-get?house='+encodeURIComponent(HOUSE)+'&id='+ph.dataset.photo);
       const d=await r.json();
       const lb=document.getElementById('lightbox');
-      lb.innerHTML=`<img src="${d.data}">`; lb.classList.remove('hide');
+      lb.innerHTML=`<div style="text-align:center"><img src="${d.data}">
+        <div style="margin-top:14px"><button class="btn bad" style="width:auto;padding:12px 20px" data-delphoto="${ph.dataset.photo}">Delete this photo</button></div></div>`;
+      lb.classList.remove('hide');
     }catch(e){ alert('Could not load that photo.'); }
+    return;
+  }
+  const dp=t.closest('[data-delphoto]');
+  if(dp){
+    try{ await post('/purge-photo',{id:+dp.dataset.delphoto}); document.getElementById('lightbox').classList.add('hide'); await pull(); toast('Deleted'); }
+    catch(e){ alert(e.message); }
     return;
   }
   if(t.closest('#lightbox')){ document.getElementById('lightbox').classList.add('hide'); return; }
@@ -1194,7 +1261,15 @@ function hangUp(){
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 let installPrompt=null;
-window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installPrompt=e; });
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
+window.addEventListener('appinstalled',()=>{ document.getElementById('installbar').classList.add('hide'); });
+
+function showInstallBar(){
+  if(matchMedia('(display-mode: standalone)').matches) return;
+  if(LS.get('noInstall',false)) return;
+  document.getElementById('installbar').classList.remove('hide');
+}
+setTimeout(showInstallBar, 2500);   // also offer it where the prompt event never fires
 
 render(); pull();
 setInterval(()=>{ if(tab!=='setup' && !sub && !saving) pull(); }, 15000);
