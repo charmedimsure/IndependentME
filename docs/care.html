@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#14161C">
+<meta name="mobile-web-app-capable" content="yes">
+<title>IndependentME · Care</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Care side. Deliberately the tablet's opposite: quiet, dark,
+   dense, built for glancing at one-handed. Same type family so
+   it still reads as one product.
+   ============================================================ */
+:root{
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Figtree',system-ui,-apple-system,sans-serif;
+  --bg:#14161C; --panel:#1D2029; --panel-2:#252936;
+  --ink:#EDEFF5; --soft:#8E95A8; --line:rgba(255,255,255,.09);
+  --ok:#3ECF7C; --warn:#F2B33D; --miss:#E8604C; --amber:#F4C77E;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);padding-bottom:110px}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:-.02em;margin:0}
+.wrap{max-width:620px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top)) 16px 0}
+.hide{display:none!important}
+
+.top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:22px}
+.top h1{font-size:28px}
+.top .st{font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--soft)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--miss);margin-right:6px;vertical-align:middle}
+.dot.on{background:var(--ok)}
+
+.panel{background:var(--panel);border-radius:18px;padding:18px;margin-bottom:14px}
+.panel h3{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--soft);margin-bottom:16px}
+
+/* progress ring */
+.summary{display:flex;align-items:center;gap:20px}
+.ring{width:92px;height:92px;flex:none;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .bg{stroke:var(--panel-2);stroke-width:9;fill:none}
+.ring .fg{stroke:var(--ok);stroke-width:9;fill:none;stroke-linecap:round;transition:stroke-dashoffset .6s ease}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-size:25px}
+.summary .txt{font-size:15px;color:var(--soft);font-weight:600;line-height:1.5}
+.summary .txt b{display:block;font-family:var(--display);font-size:22px;color:var(--ink);margin-bottom:4px}
+
+.trow{display:flex;align-items:center;gap:13px;padding:12px 0;border-bottom:1px solid var(--line)}
+.trow:last-child{border-bottom:0}
+.tico{width:42px;height:42px;border-radius:12px;flex:none;display:grid;place-items:center;font-size:22px;background:var(--panel-2);overflow:hidden}
+.tico img{width:100%;height:100%;object-fit:cover}
+.tmain{flex:1;min-width:0}
+.tname{font-weight:800;font-size:16px}
+.tsub{font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px}
+.tstat{font-size:12px;font-weight:800;padding:6px 11px;border-radius:20px;white-space:nowrap}
+.s-ok{background:rgba(62,207,124,.15);color:var(--ok)}
+.s-wait{background:rgba(255,255,255,.06);color:var(--soft)}
+.s-late{background:rgba(232,96,76,.15);color:var(--miss)}
+
+/* week grid */
+.week{display:grid;grid-template-columns:1fr repeat(7,26px);gap:5px;align-items:center;font-size:11px}
+.week .h{color:var(--soft);font-weight:800;text-align:center;text-transform:uppercase;letter-spacing:.04em}
+.week .lbl{font-weight:700;font-size:12.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:6px}
+.cell{height:26px;border-radius:7px;background:var(--panel-2)}
+.cell.y{background:var(--ok)}
+.cell.n{background:rgba(232,96,76,.28)}
+.cell.x{background:transparent;border:1px dashed var(--line)}
+
+/* messages */
+.msg{display:flex;gap:11px;margin-bottom:14px;align-items:flex-start}
+.msg .b{padding:13px 15px;border-radius:16px;font-size:15.5px;font-weight:600;line-height:1.4;max-width:80%}
+.msg.from .b{background:var(--panel-2);border-top-left-radius:5px}
+.msg.to{flex-direction:row-reverse}
+.msg.to .b{background:var(--amber);color:#22201C;border-top-right-radius:5px}
+.msg .av{font-size:26px;line-height:1;padding-top:4px}
+.msg .when{font-size:11px;color:var(--soft);font-weight:700;margin-top:5px}
+.unseen{box-shadow:0 0 0 2px var(--amber)}
+.quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.quick button{padding:9px 13px;border-radius:20px;border:1px solid var(--line);font-size:14px;font-weight:700}
+
+/* forms */
+label.f{display:block;font-size:11.5px;font-weight:800;color:var(--soft);margin:16px 0 7px;text-transform:uppercase;letter-spacing:.09em}
+input,select,textarea{width:100%;padding:13px;font:inherit;font-size:16px;color:var(--ink);background:var(--panel-2);border:1px solid var(--line);border-radius:12px}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-offset:1px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:13px;font-weight:800;font-size:15.5px;background:var(--amber);color:#22201C;width:100%}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.bad{background:rgba(232,96,76,.16);color:var(--miss)}
+.row{display:flex;gap:9px}
+.chip{padding:11px;border-radius:11px;border:1px solid var(--line);font-weight:800;font-size:14px;flex:1;text-align:center;color:var(--soft)}
+.chip[aria-pressed="true"]{background:var(--amber);color:#22201C;border-color:var(--amber)}
+.emojis{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.emojis button{width:42px;height:42px;border-radius:11px;border:1px solid var(--line);font-size:21px}
+.emojis button[aria-pressed="true"]{background:var(--panel-2);border-color:var(--amber)}
+.note{font-size:12.5px;color:var(--soft);line-height:1.6;font-weight:600}
+.empty{text-align:center;color:var(--soft);font-weight:600;padding:34px 10px;font-size:14.5px}
+
+.bar{position:fixed;left:0;right:0;bottom:0;background:rgba(20,22,28,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:9px 12px calc(9px + env(safe-area-inset-bottom))}
+.bar-in{max-width:620px;margin:0 auto;display:flex}
+.tab{flex:1;padding:9px 4px;display:grid;place-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--soft);position:relative}
+.tab em{font-style:normal;font-size:21px}
+.tab[aria-current="true"]{color:var(--amber)}
+.tab .bdg{position:absolute;top:2px;right:calc(50% - 24px);min-width:19px;height:19px;border-radius:10px;background:var(--miss);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 5px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <h1 id="pageTitle">Today</h1>
+    <div class="st"><span class="dot" id="conn"></span><span id="connTxt">offline</span></div>
+  </div>
+  <div id="view"></div>
+</div>
+
+<nav class="bar"><div class="bar-in">
+  <button class="tab" data-tab="today" aria-current="true"><em>◎</em>Today</button>
+  <button class="tab" data-tab="week"><em>▦</em>Week</button>
+  <button class="tab" data-tab="msgs"><em>💬</em>Messages<span class="bdg hide" id="bdg">0</span></button>
+  <button class="tab" data-tab="setup"><em>⚙</em>Setup</button>
+</div></nav>
+
+<style>
+.checkin{display:flex;gap:10px;margin-bottom:14px}
+.checkin button{flex:1;padding:15px;border-radius:14px;font-weight:800;font-size:15px}
+.ci-ask{background:var(--amber);color:#22201C}
+.ci-call{background:var(--mark,#3B6BE8);color:#fff;background:#3B6BE8}
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+.shot{border-radius:14px;overflow:hidden;background:var(--panel-2);aspect-ratio:3/4;position:relative;border:0;padding:0}
+.shot img{width:100%;height:100%;object-fit:cover}
+.shot .t{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(transparent,rgba(0,0,0,.75));
+  color:#fff;font-size:10.5px;font-weight:800;padding:14px 5px 5px}
+.lightbox{position:fixed;inset:0;background:rgba(10,11,14,.96);z-index:60;display:grid;place-items:center;padding:20px}
+.lightbox img{max-width:100%;max-height:80vh;border-radius:14px}
+.callwrap{position:fixed;inset:0;background:#0E1016;z-index:70;display:flex;flex-direction:column}
+.callwrap video{width:100%;height:100%;object-fit:cover;background:#0E1016}
+.callwrap .far{flex:1;min-height:0}
+.callwrap .near{position:absolute;right:14px;top:calc(14px + env(safe-area-inset-top));width:104px;height:142px;
+  border-radius:14px;overflow:hidden;border:2px solid rgba(255,255,255,.25)}
+.callwrap .st{position:absolute;left:0;right:0;top:45%;text-align:center;color:#fff;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:22px}
+.callwrap .bar{position:absolute;left:0;right:0;bottom:0;padding:20px calc(20px + env(safe-area-inset-bottom));display:flex;justify-content:center}
+.callwrap .hang{background:var(--miss);color:#fff;border-radius:40px;padding:17px 40px;font-weight:800;font-size:18px}
+</style>
+<div class="lightbox hide" id="lightbox"></div>
+<div class="callwrap hide" id="callwrap"></div>
+<script>
+const LS={
+  get(k,d){ try{const v=localStorage.getItem('imec.'+k); return v?JSON.parse(v):d;}catch(e){return d;} },
+  set(k,v){ try{localStorage.setItem('imec.'+k,JSON.stringify(v));}catch(e){} }
+};
+let API=LS.get('api',''), HOUSE=LS.get('house',''), CARE=LS.get('care',''), ME=LS.get('me','');
+
+/* An invite link fills all of this in, so nobody has to type a worker URL.
+   Format: care.html#api=...&house=...&care=...&me=Nan */
+(function(){
+  if(!location.hash) return;
+  const q={}; location.hash.slice(1).split('&').forEach(kv=>{
+    const [k,v]=kv.split('='); if(k) q[k]=decodeURIComponent(v||'');
+  });
+  if(q.api){ API=q.api; LS.set('api',API); }
+  if(q.house){ HOUSE=q.house; LS.set('house',HOUSE); }
+  if(q.care){ CARE=q.care; LS.set('care',CARE); }
+  if(q.me){ ME=q.me; LS.set('me',ME); }
+  history.replaceState(null,'',location.pathname);
+})();
+let CFG=LS.get('config',null), DONE=[], MSGS=[], WEEK=[], PHOTOS=[];
+let online=false, tab='today', lastCount=0;
+
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const D3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const key=d=>{d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const mins=t=>{const[h,m]=t.split(':').map(Number);return h*60+m;};
+const pretty=t=>{let[h,m]=t.split(':').map(Number);const ap=h<12?'am':'pm';h=h%12||12;return h+':'+String(m).padStart(2,'0')+ap;};
+const clock=ms=>{const d=new Date(ms);let h=d.getHours()%12||12;return h+':'+String(d.getMinutes()).padStart(2,'0')+(d.getHours()<12?'am':'pm');};
+function careFree(p){
+  if(p.override==='free') return true;
+  if(p.override==='busy') return false;
+  const b=p.busy; if(!b||!(b.days||[]).length) return true;
+  const now=new Date(); if(!b.days.includes(now.getDay())) return true;
+  const cur=now.getHours()*60+now.getMinutes();
+  return cur<mins(b.from)||cur>=mins(b.to);
+}
+function awayWin(){
+  const dow=new Date().getDay(), k=key();
+  const e=((CFG&&CFG.events)||[]).find(x=>x.away&&x.from&&x.to&&(x.kind==='date'?x.date===k:(x.days||[]).includes(dow)));
+  return e?{from:mins(e.from),to:mins(e.to),title:e.title}:null;
+}
+function effT(t){
+  const w=awayWin(), m=mins(t.time);
+  return (w&&m>=w.from&&m<w.to) ? w.to+5 : m;
+}
+const dueOn=(t,dow)=>t.freq==='daily'||(t.days||[]).includes(dow);
+
+const blank=()=>({
+  name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8,
+  events:[
+    {id:uid(),title:'Day service',icon:'🚐',photo:null,kind:'weekly',days:[2,3,4],from:'08:45',to:'15:00',warn:20,big:true,away:true,
+     items:[{icon:'🎨',label:'activities'},{icon:'🍽️',label:'lunch there'}],note:'Home by three.'}
+  ],
+  lat:39.7137, lon:-82.5993, place:'Lancaster, Ohio',
+  wardrobe:[
+    {id:uid(),name:'Warm coat',       icon:'🧥',photo:null,layer:'outer', minF:-20,maxF:48, rain:false},
+    {id:uid(),name:'Sweater',         icon:'🧶',photo:null,layer:'outer', minF:40, maxF:65, rain:false},
+    {id:uid(),name:'Raincoat',        icon:'☔',photo:null,layer:'outer', minF:33, maxF:120,rain:true},
+    {id:uid(),name:'T-shirt',         icon:'👕',photo:null,layer:'top',   minF:62, maxF:120,rain:false},
+    {id:uid(),name:'Long sleeves',    icon:'👚',photo:null,layer:'top',   minF:-20,maxF:68, rain:false},
+    {id:uid(),name:'Shorts',          icon:'🩳',photo:null,layer:'bottom',minF:70, maxF:120,rain:false},
+    {id:uid(),name:'Pants',           icon:'👖',photo:null,layer:'bottom',minF:-20,maxF:78, rain:false},
+    {id:uid(),name:'Sneakers',        icon:'👟',photo:null,layer:'feet',  minF:34, maxF:120,rain:false},
+    {id:uid(),name:'Boots',           icon:'🥾',photo:null,layer:'feet',  minF:-20,maxF:46, rain:false},
+    {id:uid(),name:'Sandals',         icon:'🩴',photo:null,layer:'feet',  minF:78, maxF:120,rain:false},
+    {id:uid(),name:'Hat and gloves',  icon:'🧤',photo:null,layer:'extra', minF:-20,maxF:33, rain:false},
+    {id:uid(),name:'Umbrella',        icon:'☂️',photo:null,layer:'extra', minF:33, maxF:120,rain:true}
+  ],
+  tasks:[
+    {id:uid(),name:'Brush teeth',icon:'🪥',photo:null,time:'07:30',freq:'daily',days:[],timer:180},
+    {id:uid(),name:'Brush hair',icon:'💇',photo:null,time:'07:45',freq:'daily',days:[]},
+    {id:uid(),name:'Get dressed',icon:'👕',photo:null,time:'08:00',freq:'daily',days:[],outfit:true},
+    {id:uid(),name:'Eat breakfast',icon:'🥣',photo:null,time:'08:30',freq:'daily',days:[]},
+    {id:uid(),name:'Take a shower',icon:'🚿',photo:null,time:'18:00',freq:'daily',days:[],timer:0,preview:true,steps:[
+      {id:uid(),icon:'👕',label:'Take your clothes off',photo:null},
+      {id:uid(),icon:'🚿',label:'Turn the water on',photo:null},
+      {id:uid(),icon:'💧',label:'Get your hair wet',photo:null},
+      {id:uid(),icon:'🧴',label:'Shampoo your hair',photo:null},
+      {id:uid(),icon:'🚿',label:'Rinse it all out',photo:null},
+      {id:uid(),icon:'🧼',label:'Wash your body with soap',photo:null},
+      {id:uid(),icon:'🚿',label:'Rinse the soap off',photo:null},
+      {id:uid(),icon:'🛑',label:'Turn the water off',photo:null},
+      {id:uid(),icon:'🧻',label:'Dry with your towel',photo:null}
+    ]},
+    {id:uid(),name:'Brush teeth',icon:'🪥',photo:null,time:'21:00',freq:'daily',days:[],timer:180},
+    {id:uid(),name:'Wash hair',rollover:true,icon:'🧴',photo:null,time:'18:00',freq:'weekly',days:[0,3]},
+    {id:uid(),name:'Laundry',rollover:true,icon:'🧺',photo:null,time:'11:00',freq:'weekly',days:[6]},
+    {id:uid(),name:'Change sheets',rollover:true,icon:'🛏️',photo:null,time:'11:00',freq:'weekly',days:[6]}
+  ],
+  contacts:[],
+  phrases:[
+    {id:uid(),icon:'👋',text:'Hi! Thinking about you.'},
+    {id:uid(),icon:'🆘',text:'I need help please.'},
+    {id:uid(),icon:'✅',text:'I finished everything today!'},
+    {id:uid(),icon:'🍽️',text:"I'm hungry."},
+    {id:uid(),icon:'📞',text:'Can you call me?'},
+    {id:uid(),icon:'❤️',text:'I love you.'},
+    {id:uid(),icon:'😴',text:"I'm tired."},
+    {id:uid(),icon:'🤒',text:"I don't feel good."}
+  ]
+});
+
+/* ---------- network ---------- */
+async function post(path,body){
+  const r=await fetch(API.replace(/\/$/,'')+path,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(Object.assign({house:HOUSE,care:CARE},body))
+  });
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+  return j;
+}
+async function pull(){
+  if(!API||!HOUSE){ setConn(false); return; }
+  try{
+    const base=API.replace(/\/$/,'');
+    const r=await fetch(base+'/pull?house='+encodeURIComponent(HOUSE)+'&day='+key());
+    if(!r.ok) throw 0;
+    const d=await r.json();
+    if(d.config) { CFG=d.config; LS.set('config',CFG); }
+    DONE=d.done||[]; PHOTOS=d.photos||[]; 
+    const prev=MSGS.filter(m=>m.dir==='out').length;
+    MSGS=d.messages||[];
+    const now=MSGS.filter(m=>m.dir==='out').length;
+    if(now>prev && lastCount>0) ping();
+    lastCount=now;
+
+    const from=new Date(); from.setDate(from.getDate()-6);
+    const w=await fetch(base+'/week?house='+encodeURIComponent(HOUSE)+'&from='+key(from));
+    WEEK=(await w.json()).log||[];
+    setConn(true);
+  }catch(e){ setConn(false); }
+  render();
+}
+function setConn(v){
+  online=v;
+  document.getElementById('conn').classList.toggle('on',v);
+  document.getElementById('connTxt').textContent = v?'connected':(API?'offline':'not set up');
+}
+function ping(){
+  try{ new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
+  if('Notification' in window && Notification.permission==='granted'){
+    const m=MSGS.filter(x=>x.dir==='out').slice(-1)[0];
+    if(m) try{ new Notification('Message from '+(CFG&&CFG.name||'home'),{body:m.body,tag:'c'+m.id}); }catch(e){}
+  }
+}
+
+/* ---------- views ---------- */
+function render(){
+  document.getElementById('pageTitle').textContent =
+    {today:'Today',week:'This week',msgs:'Messages',setup:'Setup'}[tab];
+  const unread=MSGS.filter(m=>(m.dir==='out'||m.dir==='alert')&&!m.seen).length;
+  const b=document.getElementById('bdg');
+  b.textContent=unread; b.classList.toggle('hide',unread===0);
+  document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-current',x.dataset.tab===tab));
+  ({today:viewToday,week:viewWeek,msgs:viewMsgs,setup:viewSetup}[tab])();
+  if(tab==='msgs') loadShots();
+}
+
+function viewToday(){
+  const el=document.getElementById('view');
+  if(!CFG){ el.innerHTML=`<div class="panel"><div class="empty">Not connected yet. Open Setup to add the worker address and household code.</div></div>`; return; }
+  const dow=new Date().getDay();
+  const list=(CFG.tasks||[]).filter(t=>dueOn(t,dow)).sort((a,b)=>effT(a)-effT(b));
+  const doneMap={}; DONE.forEach(d=>doneMap[d.id]=d.at);
+  const nowM=new Date().getHours()*60+new Date().getMinutes();
+  const n=list.filter(t=>doneMap[t.id]).length;
+  const pct=list.length?n/list.length:0;
+  const C=2*Math.PI*40;
+
+  el.innerHTML=`
+  <div class="panel"><div class="summary">
+    <div class="ring"><svg width="92" height="92" viewBox="0 0 92 92">
+      <circle class="bg" cx="46" cy="46" r="40"/>
+      <circle class="fg" cx="46" cy="46" r="40" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}"/>
+    </svg><b>${n}/${list.length}</b></div>
+    <div class="txt"><b>${DAYS[dow]}${awayWin()?' · out '+pretty(((CFG.events||[]).find(e=>e.away)||{}).from||'')+'\u2013'+pretty(((CFG.events||[]).find(e=>e.away)||{}).to||''):''}</b>${
+      !list.length?'Nothing scheduled today.'
+      : n===list.length?'Everything is done. Nice day.'
+      : (list.filter(t=>!doneMap[t.id]&&effT(t)<nowM-30).length
+          ? list.filter(t=>!doneMap[t.id]&&effT(t)<nowM-30).length+' past due, '+(list.length-n)+' left overall.'
+          : (list.length-n)+' still to go, nothing overdue.')}</div>
+  </div></div>
+
+  <div class="panel"><h3>The list</h3>${
+    list.length? list.map(t=>{
+      const at=doneMap[t.id];
+      const late=!at && effT(t)<nowM-30;
+      return `<div class="trow">
+        <div class="tico">${t.photo?`<img src="${t.photo}">`:t.icon}</div>
+        <div class="tmain"><div class="tname">${esc(t.name)}</div>
+          <div class="tsub">${effT(t)!==mins(t.time)?'after she is home':pretty(t.time)}${t.freq==='weekly'?' · weekly':''}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
+        <div class="tstat ${at?'s-ok':late?'s-late':'s-wait'}">${at?'✓ '+clock(at):late?'past due':'waiting'}</div>
+      </div>`;
+    }).join('') : '<div class="empty">Nothing scheduled today.</div>'}
+  </div>`;
+}
+
+function viewWeek(){
+  const el=document.getElementById('view');
+  if(!CFG){ el.innerHTML=`<div class="panel"><div class="empty">Connect in Setup first.</div></div>`; return; }
+  const days=[]; for(let i=6;i>=0;i--){ const d=new Date(); d.setDate(d.getDate()-i); days.push(d); }
+  const map={}; WEEK.forEach(r=>{ map[r.day+'|'+r.task_id]=true; });
+  const nowKey=key();
+
+  el.innerHTML=`<div class="panel"><h3>Last 7 days</h3>
+    <div class="week">
+      <div></div>${days.map(d=>`<div class="h">${D3[d.getDay()][0]}</div>`).join('')}
+      ${(CFG.tasks||[]).map(t=>`<div class="lbl">${esc(t.name)}</div>`+
+        days.map(d=>{
+          const k=key(d);
+          if(!dueOn(t,d.getDay())) return `<div class="cell x"></div>`;
+          if(map[k+'|'+t.id]) return `<div class="cell y"></div>`;
+          return `<div class="cell ${k===nowKey?'':'n'}"></div>`;
+        }).join('')).join('')}
+    </div>
+    <p class="note" style="margin-top:16px">Green is done. Red is a day it was scheduled and not checked off. Dashed means it wasn't on the list that day. Today's blanks are just not-yet.</p>
+  </div>`;
+}
+
+async function loadShots(){
+  for(const ph of PHOTOS){
+    const el=document.querySelector(`[data-photo="${ph.id}"]`);
+    if(!el || el.querySelector('img')) continue;
+    try{
+      const r=await fetch(API.replace(/\/$/,'')+'/photo-get?house='+encodeURIComponent(HOUSE)+'&id='+ph.id);
+      const d=await r.json();
+      const img=new Image(); img.src=d.data; el.prepend(img);
+    }catch(e){}
+  }
+}
+
+function viewMsgs(){
+  const el=document.getElementById('view');
+  const quick=['On my way.','Yes, go ahead.','I will call you soon.','Great job today!','Love you too.','I am here.'];
+  el.innerHTML=`
+    <div class="panel"><h3>Check in</h3>
+      <div class="checkin">
+        <button class="ci-ask" id="ciAsk">👋 Ask to see her</button>
+        <button class="ci-call" id="ciCall">📹 Video call</button>
+      </div>
+      <p class="note">She gets a prompt with your name on it and chooses: send a picture, start a call, or not right now. Nothing opens her camera without her tapping it.</p>
+      ${PHOTOS.length?`<div class="shots" style="margin-top:16px">${PHOTOS.map(ph=>
+        `<button class="shot" data-photo="${ph.id}"><div class="t">${clock(ph.at)}</div></button>`).join('')}</div>`:''}
+    </div>
+
+    <div class="panel"><h3>Send a message</h3>
+      <div class="quick">${quick.map(q=>`<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <textarea id="reply" rows="2" placeholder="Type something to read out on the tablet"></textarea>
+      <button class="btn" style="margin-top:11px" id="sendBtn">Send to the tablet</button>
+      <p class="note" style="margin-top:10px">It arrives on her screen with a chime and is read out loud, so it works whether or not she reads it.</p>
+    </div>
+    <div class="panel"><h3>History</h3>${
+      MSGS.length ? MSGS.slice().reverse().map(m=>
+        m.dir==='alert'
+        ? `<div class="msg from"><div class="av">${m.icon||'⏰'}</div><div>
+             <div class="b ${m.seen?'':'unseen'}" style="background:${m.icon==='🆘'?'rgba(232,96,76,.16);color:var(--miss)':'rgba(242,179,61,.14);color:var(--warn)'}">${esc(m.body)}</div>
+             <div class="when">${m.who?'she asked '+esc(m.who):'everyone'} · ${clock(m.at)}${m.ack?' · '+esc(m.ack)+' has it':''}</div>
+             ${(m.icon==='🆘'&&!m.ack)?`<button class="btn" style="margin-top:8px;padding:10px 14px;font-size:14px;width:auto" data-ack="${m.id}">I've got this</button>`:''}
+             </div></div>`
+        : m.dir==='out'
+        ? `<div class="msg from"><div class="av">${m.icon||'💬'}</div><div>
+             <div class="b ${m.seen?'':'unseen'}">${esc(m.body)}</div>
+             <div class="when">to ${esc(m.who||'')} · ${clock(m.at)}</div></div></div>`
+        : `<div class="msg to"><div class="av">↩︎</div><div>
+             <div class="b">${esc(m.body)}</div><div class="when">${esc(m.who||'someone')} · ${clock(m.at)}</div></div></div>`
+      ).join('') : '<div class="empty">No messages yet.</div>'}
+    </div>`;
+}
+
+/* ---------- setup ---------- */
+let sub=null;
+function viewSetup(){
+  const el=document.getElementById('view');
+  if(sub==='ward') return editWard();
+  if(sub==='event') return editEvent();
+  if(sub==='task') return editTask();
+  if(sub==='contact') return editContact();
+  if(sub==='phrase') return editPhrase();
+  if(sub==='ward') return editWard();
+  if(sub==='event') return editEvent();
+
+  el.innerHTML=`
+  <div class="panel"><h3>Connection</h3>
+    <label class="f">Worker address</label>
+    <input id="sApi" value="${esc(API)}" placeholder="https://independentme.workers.dev" autocapitalize="off" spellcheck="false">
+    <label class="f">Household code</label>
+    <input id="sHouse" value="${esc(HOUSE)}" placeholder="karelynn-home" autocapitalize="off" spellcheck="false">
+    <label class="f">Caregiver key</label>
+    <input id="sCare" value="${esc(CARE)}" placeholder="a long private phrase" autocapitalize="off" spellcheck="false">
+    <button class="btn" style="margin-top:16px" id="saveConn">Save and connect</button>
+    <p class="note" style="margin-top:10px">The tablet needs the worker address and household code. The caregiver key stays on your phone only, and is what lets this app change things.</p>
+  </div>
+
+  <div class="panel"><h3>Who you are on this device</h3>
+    <select id="sMe">
+      <option value="">— pick yourself —</option>
+      ${(CFG&&CFG.contacts||[]).map(c=>`<option value="${esc(c.name)}" ${ME===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
+    </select>
+    <button class="btn" style="margin-top:14px" id="saveMe">Save</button>
+    <p class="note" style="margin-top:10px">This is the name on your replies. Everyone shares one caregiver key, so this is a name tag rather than a login — fine among the four of you, worth knowing anyway.</p>
+    ${ME?`<button class="btn ghost" style="margin-top:12px" id="invite">Copy an invite link for someone else</button>`:''}
+  </div>
+
+  <div class="panel"><h3>Her name</h3>
+    <input id="sName" value="${esc((CFG&&CFG.name)||'')}" placeholder="Karelynn">
+    <label class="f">How fast she's spoken to</label>
+    <select id="sRate">${[[0.6,'Very slow'],[0.7,'Slow'],[0.8,'Steady'],[0.9,'Normal']].map(([v,l])=>`<option value="${v}" ${((CFG&&CFG.speechRate)||0.8)===v?'selected':''}>${l}</option>`).join('')}</select>
+    <p class="note" style="margin-top:8px">Hearing loss is common with Down syndrome and often goes unnoticed. If she asks people to repeat things, slow this down and check the tablet volume.</p>
+
+    <label class="f">Phone alerts (ntfy topic)</label>
+    <input id="sNtfy" value="${esc((CFG&&CFG.ntfy)||'')}" placeholder="karelynn-msgs-9x4f" autocapitalize="off" spellcheck="false">
+    <p class="note" style="margin-top:8px">Install the free ntfy app, subscribe to this exact topic, and her messages buzz your phone even when this app is closed. Leave blank to skip.</p>
+    <button class="btn" style="margin-top:14px" id="saveName">Save</button>
+  </div>
+
+  <div class="panel"><h3>How firm the reminders are</h3>
+    <label class="f">"Not yet" pushes it back by</label>
+    <select id="sSnooze">${[5,10,15,20,30].map(n=>`<option value="${n}" ${((CFG&&CFG.snoozeMinutes)||10)===n?'selected':''}>${n} minutes</option>`).join('')}</select>
+    <label class="f">She can put it off this many times</label>
+    <select id="sMax">${[0,1,2,3,5].map(n=>`<option value="${n}" ${((CFG&&CFG.maxSnoozes)!=null?CFG.maxSnoozes:3)===n?'selected':''}>${n===0?'Never — no Not yet button':n+' time'+(n>1?'s':'')}</option>`).join('')}</select>
+    <label class="f">If nobody answers "I need help", open it to everyone after</label>
+    <select id="sFallback">${[0,5,10,15,30].map(n=>`<option value="${n}" ${((CFG&&CFG.helpFallbackMinutes)!=null?CFG.helpFallbackMinutes:10)===n?'selected':''}>${n===0?'Never — only the person she asked':n+' minutes'}</option>`).join('')}</select>
+    <label class="f">Who hears about a task being put off</label>
+    <select id="sNudge">
+      <option value="primary" ${((CFG&&CFG.nudgeTo)||'primary')==='primary'?'selected':''}>Only the always-shown people</option>
+      <option value="all" ${(CFG&&CFG.nudgeTo)==='all'?'selected':''}>Everyone</option>
+    </select>
+    <p class="note" style="margin-top:8px">Help requests always go to the person she asked. This is only about the quiet heads-up when something's been postponed twice.</p>
+    <button class="btn" style="margin-top:16px" id="saveRules">Save</button>
+    <p class="note" style="margin-top:10px">After the last one, "Not yet" is replaced with "I need help", which messages you. The alarm never gets louder or scolds her; it hands her to a person instead.</p>
+  </div>
+
+  <div class="panel"><h3>Things to do</h3>
+    ${(CFG&&CFG.tasks||[]).slice().sort((a,b)=>mins(a.time)-mins(b.time)).map(t=>`
+      <div class="trow"><div class="tico">${t.photo?`<img src="${t.photo}">`:t.icon}</div>
+      <div class="tmain"><div class="tname">${esc(t.name)}</div>
+        <div class="tsub">${t.freq==='daily'?'Every day':(t.days||[]).map(d=>D3[d]).join(', ')||'no days set'} · ${pretty(t.time)}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
+      <button class="tstat s-wait" data-etask="${t.id}">edit</button></div>`).join('')
+      || '<div class="empty">No tasks yet.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-etask="new">+ Add a task</button>
+  </div>
+
+  <div class="panel"><h3>What's happening</h3>
+    ${(CFG&&CFG.events||[]).map(e=>`
+      <div class="trow"><div class="tico">${e.photo?`<img src="${e.photo}">`:e.icon}</div>
+      <div class="tmain"><div class="tname">${esc(e.title)}</div>
+        <div class="tsub">${e.kind==='date'?e.date:(e.days||[]).map(d=>D3[d]).join(', ')}${e.from?' · '+pretty(e.from):''}</div></div>
+      <button class="tstat s-wait" data-eev="${e.id}">edit</button></div>`).join('')
+      || '<div class="empty">Nothing on the calendar.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-eev="new">+ Add something</button>
+    <p class="note" style="margin-top:12px">Shown on her screen as pictures she can tap to hear. Day service is already set for Tuesday, Wednesday and Thursday — add the day's activities to it, or add one-off entries for appointments and visitors.</p>
+  </div>
+
+  <div class="panel"><h3>Weather</h3>
+    <label class="f">Where she is</label>
+    <input id="sPlace" value="${esc((CFG&&CFG.place)||'')}" placeholder="Lancaster, Ohio">
+    <div class="row" style="margin-top:10px">
+      <input id="sLat" value="${(CFG&&CFG.lat)!=null?CFG.lat:''}" placeholder="latitude" inputmode="decimal">
+      <input id="sLon" value="${(CFG&&CFG.lon)!=null?CFG.lon:''}" placeholder="longitude" inputmode="decimal">
+    </div>
+    <button class="btn" style="margin-top:14px" id="saveWx">Save</button>
+    <p class="note" style="margin-top:10px">Forecast comes from Open-Meteo, free and no account needed. She's only warned about the forecast when it would change what she wears — rain coming, or a big temperature swing.</p>
+  </div>
+
+  <div class="panel"><h3>Her clothes</h3>
+    ${(CFG&&CFG.wardrobe||[]).map(w=>`
+      <div class="trow"><div class="tico">${w.photo?`<img src="${w.photo}">`:w.icon}</div>
+      <div class="tmain"><div class="tname">${esc(w.name)}</div>
+        <div class="tsub">${({outer:'Coat',top:'Shirt',bottom:'Pants',feet:'Shoes',extra:'Also'})[w.layer]||w.layer} · ${w.minF}°–${w.maxF}°${w.rain?' · rain':''}</div></div>
+      <button class="tstat s-wait" data-eward="${w.id}">edit</button></div>`).join('')
+      || '<div class="empty">Nothing here yet.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-eward="new">+ Add a kind of clothing</button>
+    <p class="note" style="margin-top:12px">These are kinds of clothing, not specific garments, so laundry day can't make the app wrong. Adjust the temperatures to suit her — if she runs cold, push the coat up to 55.</p>
+  </div>
+
+  <div class="panel"><h3>People she can message</h3>
+    ${(CFG&&CFG.contacts||[]).map(c=>`
+      <div class="trow"><div class="tico" style="border-radius:50%">${c.photo?`<img src="${c.photo}">`:c.icon}</div>
+      <div class="tmain"><div class="tname">${esc(c.name)}</div>
+        <div class="tsub">${careFree(c)?'available now':'not available now'}${c.fallback?' · always shown':''}${c.ntfy?'':' · no alerts set up'}</div></div>
+      <button class="tstat s-wait" data-econ="${c.id}">edit</button></div>`).join('')
+      || '<div class="empty">No people yet. Add at least one so the Messages tab works on her tablet.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-econ="new">+ Add a person</button>
+  </div>
+
+  <div class="panel"><h3>Things she can say</h3>
+    ${(CFG&&CFG.phrases||[]).map(p=>`
+      <div class="trow"><div class="tico">${p.icon}</div>
+      <div class="tmain"><div class="tname">${esc(p.text)}</div></div>
+      <button class="tstat s-wait" data-ephr="${p.id}">edit</button></div>`).join('')
+      || '<div class="empty">No phrases yet.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-ephr="new">+ Add a phrase</button>
+  </div>
+
+  <div class="panel"><h3>Alerts on this phone</h3>
+    <button class="btn ghost" id="askNotif">Turn on notifications</button>
+  </div>`;
+}
+
+const TASK_ICONS=['🪥','💇','🚿','🛁','👕','🥣','🍎','💊','🧴','🧺','🛏️','💅','🚽','🧼','🧹','🗑️','👟','🎒','📺','🐕','☎️','💧','🌙','🧦','🪒','🧽','📅','🎵'];
+const PERSON_ICONS=['👩','👨','👵','👴','🧑','👧','👦','🐕','💗','🏠'];
+const SAY_ICONS=['👋','🆘','✅','🍽️','📞','❤️','😴','🤒','😊','😢','❓','🏠','🚗','🎉'];
+
+let draft=null;
+function editTask(){
+  const t=draft;
+  document.getElementById('view').innerHTML=`
+  <div class="panel"><h3>${t._new?'New task':'Edit task'}</h3>
+    <label class="f">What is it called</label>
+    <input id="dName" value="${esc(t.name)}" placeholder="Brush teeth">
+    <label class="f">Picture</label>
+    <div class="row" style="align-items:center">
+      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px">${t.photo?`<img src="${t.photo}">`:t.icon}</div>
+      <div style="flex:1"><button class="btn ghost" id="dPhoto">Use a photo</button>
+      ${t.photo?`<button class="btn ghost" style="margin-top:8px" id="dNoPhoto">Remove photo</button>`:''}</div>
+    </div>
+    <input type="file" accept="image/*" id="dFile" style="display:none">
+    <div class="emojis" id="dIcons">${TASK_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===t.icon}">${e}</button>`).join('')}</div>
+    <label class="f">How often</label>
+    <div class="row">
+      <button class="chip" id="fD" aria-pressed="${t.freq==='daily'}">Every day</button>
+      <button class="chip" id="fW" aria-pressed="${t.freq==='weekly'}">Certain days</button>
+    </div>
+    <div id="dDays" class="${t.freq==='weekly'?'':'hide'}">
+      <label class="f">Which days</label>
+      <div class="row" style="gap:4px">${D3.map((d,i)=>`<button class="chip" style="padding:11px 2px" data-day="${i}" aria-pressed="${(t.days||[]).includes(i)}">${d[0]}</button>`).join('')}</div>
+    </div>
+    <label class="f">What time</label>
+    <input type="time" id="dTime" value="${t.time}">
+    <label class="f">Timer</label>
+    <select id="dTimer">
+      ${[[0,'No timer — just check it off'],[30,'30 seconds'],[60,'1 minute'],[120,'2 minutes'],[180,'3 minutes'],[300,'5 minutes'],[600,'10 minutes'],[900,'15 minutes'],[1200,'20 minutes']]
+        .map(([v,l])=>`<option value="${v}" ${(t.timer||0)===v?'selected':''}>${l}</option>`).join('')}
+    </select>
+    <label class="f">Heads-up before it starts</label>
+    <select id="dWarn">${[0,2,5,10,15].map(n=>`<option value="${n}" ${((t.warn!=null?t.warn:5))===n?'selected':''}>${n===0?'No warning':n+' minutes before'}</option>`).join('')}</select>
+    <p class="note" style="margin-top:8px">A quiet note on screen, one soft note, no countdown. Time to finish what she's doing and come to it herself.</p>
+
+    <label class="f">Step by step</label>
+    <div id="stepList">${(t.steps||[]).map((st,i)=>`
+      <div class="trow"><div class="tico">${st.photo?`<img src="${st.photo}">`:st.icon}</div>
+      <div class="tmain"><div class="tname">${i+1}. ${esc(st.label)}</div></div>
+      <button class="tstat s-wait" data-stepup="${st.id}">↑</button>
+      <button class="tstat s-wait" data-stepdel="${st.id}">✕</button></div>`).join('')}</div>
+    <div class="row" style="margin-top:10px">
+      <input id="dStepNew" placeholder="Turn the water on">
+      <button class="btn" style="width:auto;padding:13px 16px" id="dStepAdd">Add</button>
+    </div>
+    <p class="note" style="margin-top:8px">Leave this empty for anything she does in one go. Add steps and her button becomes <b>Show me how</b> — one picture at a time, her place saved if she's interrupted.</p>
+    ${(t.steps||[]).length?`<button class="btn ghost" style="margin-top:10px" id="dPrint">Print these as a wall card</button>`:''}
+
+    <label class="f">Anywhere with water</label>
+    <div class="row"><button class="chip" id="dPrev2" aria-pressed="${!!t.preview}">${t.preview?'Show steps, then leave the tablet':'Tablet stays with her'}</button></div>
+    <p class="note" style="margin-top:8px">For showering and washing up. She's walked through every step first, then told to leave the tablet behind and press a button when she's back.</p>
+
+    <label class="f">If it gets missed</label>
+    <div class="row"><button class="chip" id="dRoll" aria-pressed="${!!t.rollover}">${t.rollover?'Keep it on the list':'Wait for next week'}</button></div>
+    <p class="note" style="margin-top:8px">Only applies to weekly tasks. Keeping it on the list means a missed hair wash stays there until it happens, rather than disappearing for six days.</p>
+
+    <label class="f">Getting dressed</label>
+    <div class="row"><button class="chip" id="dOutfit" aria-pressed="${!!t.outfit}">${t.outfit?'Shows the weather and her clothes':'Ordinary task'}</button></div>
+    <p class="note" style="margin-top:8px">With a timer, the big button becomes Start. A ring drains on screen, she gets told when she's halfway and at ten seconds, and it checks itself off when the time is up.</p>
+    <button class="btn" style="margin-top:18px" id="dSave">Save task</button>
+    ${t._new?'':`<button class="btn bad" style="margin-top:9px" id="dDel">Delete task</button>`}
+    <button class="btn ghost" style="margin-top:9px" id="dCancel">Cancel</button>
+  </div>`;
+}
+function editContact(){
+  const c=draft;
+  document.getElementById('view').innerHTML=`
+  <div class="panel"><h3>${c._new?'New person':'Edit person'}</h3>
+    <label class="f">Name</label>
+    <input id="dName" value="${esc(c.name)}" placeholder="Mom">
+    <label class="f">Picture</label>
+    <div class="row" style="align-items:center">
+      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px;border-radius:50%">${c.photo?`<img src="${c.photo}">`:c.icon}</div>
+      <div style="flex:1"><button class="btn ghost" id="dPhoto">Use a photo</button></div>
+    </div>
+    <input type="file" accept="image/*" id="dFile" style="display:none">
+    <div class="emojis" id="dIcons">${PERSON_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===c.icon}">${e}</button>`).join('')}</div>
+    <label class="f">When they can't be reached</label>
+    <div class="row" style="gap:4px">${D3.map((d,i)=>`<button class="chip" style="padding:11px 2px" data-bday="${i}" aria-pressed="${((c.busy&&c.busy.days)||[]).includes(i)}">${d[0]}</button>`).join('')}</div>
+    <div class="row" style="margin-top:9px">
+      <input type="time" id="dFrom" value="${(c.busy&&c.busy.from)||'08:00'}">
+      <input type="time" id="dTo" value="${(c.busy&&c.busy.to)||'17:00'}">
+    </div>
+    <p class="note" style="margin-top:8px">She isn't offered this person during these hours, so she doesn't ask someone who can't answer. Pick no days to leave them always available.</p>
+
+    <label class="f">Right now</label>
+    <div class="row">
+      <button class="chip" data-ov="auto" aria-pressed="${!c.override||c.override==='auto'}">Follow schedule</button>
+      <button class="chip" data-ov="free" aria-pressed="${c.override==='free'}">Available</button>
+      <button class="chip" data-ov="busy" aria-pressed="${c.override==='busy'}">Not now</button>
+    </div>
+
+    <label class="f">Backup for unanswered help requests</label>
+    <div class="row"><button class="chip" id="dEsc" aria-pressed="${c.escalate!==false}">${c.escalate!==false?'On the ladder':'Never chased'}</button></div>
+    <p class="note" style="margin-top:8px">Turn this off for anyone who shouldn't be the one chased down — a teenager in class, for instance.</p>
+
+    <label class="f">Always shown to her, even when busy</label>
+    <div class="row"><button class="chip" id="dFall" aria-pressed="${!!c.fallback}">${c.fallback?'Always shown':'Follows schedule'}</button></div>
+    <p class="note" style="margin-top:8px">At least one person needs this on, so she never opens the help screen and finds nobody there. Routine nudges go to these people too.</p>
+
+    <label class="f">Wait this long before chasing others</label>
+    <select id="dGrace">
+      <option value="">Use the household setting</option>
+      ${[2,5,10,15,30].map(n=>`<option value="${n}" ${c.grace===n?'selected':''}>${n} minutes</option>`).join('')}
+    </select>
+    <p class="note" style="margin-top:8px">Shorten it for someone in the same room — if they haven't answered in two minutes they're probably asleep or out.</p>
+
+    <label class="f">Their ntfy topic</label>
+    <input id="dNtfy" value="${esc(c.ntfy||'')}" placeholder="nan-karelynn-4k2p" autocapitalize="off" spellcheck="false">
+    <p class="note" style="margin-top:8px">Their own topic in the free ntfy app. Messages she sends to this person buzz this topic. Make it long and random — anyone who guesses it can read along.</p>
+    <button class="btn" style="margin-top:18px" id="dSave">Save person</button>
+    ${c._new?'':`<button class="btn bad" style="margin-top:9px" id="dDel">Remove person</button>`}
+    <button class="btn ghost" style="margin-top:9px" id="dCancel">Cancel</button>
+    <p class="note" style="margin-top:12px">Messages go to this app, not to a phone number. Anyone you want to receive them opens the care page with the same codes.</p>
+  </div>`;
+}
+const WEAR_ICONS=['🧥','🧣','🧤','👕','👚','👔','🥼','👖','🩳','👗','🧦','👟','👢','🥾','🩴','🧢','☂️','🕶️','🎒'];
+const EV_ICONS=['🚐','🏫','🎨','🎳','🎬','🛒','🏊','🍽️','🎂','💈','🩺','🦷','🚗','🏡','👵','👨','🎵','⛪','🐕','📦'];
+function editEvent(){
+  const e=draft;
+  document.getElementById('view').innerHTML=`
+  <div class="panel"><h3>${e._new?'Something new':'Edit'}</h3>
+    <label class="f">What is it</label>
+    <input id="dName" value="${esc(e.title)}" placeholder="Day service">
+    <div class="emojis" id="dIcons">${EV_ICONS.map(i=>`<button data-i="${i}" aria-pressed="${i===e.icon}">${i}</button>`).join('')}</div>
+    <label class="f">When</label>
+    <div class="row">
+      <button class="chip" id="kWeek" aria-pressed="${e.kind!=='date'}">Every week</button>
+      <button class="chip" id="kDate" aria-pressed="${e.kind==='date'}">One day only</button>
+    </div>
+    <div id="kW" class="${e.kind==='date'?'hide':''}">
+      <label class="f">Which days</label>
+      <div class="row" style="gap:4px">${D3.map((d,i)=>`<button class="chip" style="padding:11px 2px" data-eday="${i}" aria-pressed="${(e.days||[]).includes(i)}">${d[0]}</button>`).join('')}</div>
+    </div>
+    <div id="kD" class="${e.kind==='date'?'':'hide'}">
+      <label class="f">Date</label>
+      <input type="date" id="dDate" value="${e.date||''}">
+    </div>
+    <label class="f">Times</label>
+    <div class="row">
+      <input type="time" id="dFrom" value="${e.from||''}">
+      <input type="time" id="dTo" value="${e.to||''}">
+    </div>
+    <label class="f">Heads-up before it starts</label>
+    <select id="dEWarn">${[0,10,15,20,30].map(n=>`<option value="${n}" ${((e.warn!=null?e.warn:15))===n?'selected':''}>${n===0?'None':n+' minutes before'}</option>`).join('')}</select>
+
+    <label class="f">What she'll be doing</label>
+    <div id="itemList">${(e.items||[]).map(it=>`
+      <div class="trow"><div class="tico">${it.icon}</div><div class="tmain"><div class="tname">${esc(it.label)}</div></div>
+      <button class="tstat s-wait" data-itdel="${esc(it.label)}">✕</button></div>`).join('')}</div>
+    <div class="row" style="margin-top:10px">
+      <input id="dItemNew" placeholder="bowling">
+      <button class="btn" style="width:auto;padding:13px 16px" id="dItemAdd">Add</button>
+    </div>
+    <p class="note" style="margin-top:8px">She taps the card and hears these read out. Worth updating on a Monday if you know the week's plan.</p>
+
+    <label class="f">Is she out of the house</label>
+    <div class="row"><button class="chip" id="dAway" aria-pressed="${!!e.away}">${e.away?'Out, tablet stays home':'At home'}</button></div>
+    <p class="note" style="margin-top:8px">Nothing fires while she's out, and anything scheduled during these hours waits until she's back instead of piling up as missed.</p>
+
+    <label class="f">Show it large</label>
+    <div class="row"><button class="chip" id="dBig" aria-pressed="${!!e.big}">${e.big?'Stands out':'Normal'}</button></div>
+
+    <button class="btn" style="margin-top:18px" id="dSave">Save</button>
+    ${e._new?'':`<button class="btn bad" style="margin-top:9px" id="dDel">Delete</button>`}
+    <button class="btn ghost" style="margin-top:9px" id="dCancel">Cancel</button>
+  </div>`;
+}
+
+function editWard(){
+  const w=draft;
+  document.getElementById('view').innerHTML=`
+  <div class="panel"><h3>${w._new?'New item':'Edit item'}</h3>
+    <label class="f">What she calls it</label>
+    <input id="dName" value="${esc(w.name)}" placeholder="Sweater">
+    <label class="f">Picture</label>
+    <div class="row" style="align-items:center">
+      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px">${w.photo?`<img src="${w.photo}">`:w.icon}</div>
+      <div style="flex:1"><button class="btn ghost" id="dPhoto">Add a photo (optional)</button></div>
+    </div>
+    <input type="file" accept="image/*" id="dFile" style="display:none">
+    <div class="emojis" id="dIcons">${WEAR_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===w.icon}">${e}</button>`).join('')}</div>
+    <label class="f">What kind</label>
+    <select id="dLayer">${[['outer','Coat or jacket'],['top','Shirt or top'],['bottom','Pants or skirt'],['feet','Shoes'],['extra','Hat, gloves, umbrella']]
+      .map(([v,l])=>`<option value="${v}" ${w.layer===v?'selected':''}>${l}</option>`).join('')}</select>
+    <label class="f">Warm enough for</label>
+    <div class="row">
+      <input id="dMin" value="${w.minF}" inputmode="numeric" placeholder="coldest °F">
+      <input id="dMax" value="${w.maxF}" inputmode="numeric" placeholder="warmest °F">
+    </div>
+    <p class="note" style="margin-top:8px">Shown only when it's between these temperatures. A coat might be -20 to 48; a t-shirt 62 to 120.</p>
+    <p class="note" style="margin-top:6px">A photo is optional and best kept general — a pile of folded t-shirts rather than one particular shirt. Naming a specific garment risks sending her looking for something that's in the wash.</p>
+    <label class="f">Only when it's raining</label>
+    <div class="row"><button class="chip" id="dRain" aria-pressed="${!!w.rain}">${w.rain?'Rain only':'Any weather'}</button></div>
+    <button class="btn" style="margin-top:18px" id="dSave">Save item</button>
+    ${w._new?'':`<button class="btn bad" style="margin-top:9px" id="dDel">Delete item</button>`}
+    <button class="btn ghost" style="margin-top:9px" id="dCancel">Cancel</button>
+  </div>`;
+}
+
+function editPhrase(){
+  const p=draft;
+  document.getElementById('view').innerHTML=`
+  <div class="panel"><h3>${p._new?'New phrase':'Edit phrase'}</h3>
+    <label class="f">What it says</label>
+    <input id="dName" value="${esc(p.text)}" placeholder="I need help please.">
+    <label class="f">Picture</label>
+    <div class="emojis" id="dIcons">${SAY_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===p.icon}">${e}</button>`).join('')}</div>
+    <button class="btn" style="margin-top:18px" id="dSave">Save phrase</button>
+    ${p._new?'':`<button class="btn bad" style="margin-top:9px" id="dDel">Delete phrase</button>`}
+    <button class="btn ghost" style="margin-top:9px" id="dCancel">Cancel</button>
+  </div>`;
+}
+
+/* A laminated card on the bathroom wall beats a tablet near water. */
+function printSteps(t){
+  const w=window.open('','_blank');
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${t.name}</title>
+  <style>
+    @page{size:A4 portrait;margin:14mm}
+    body{font-family:system-ui,sans-serif;margin:0;color:#111}
+    h1{font-size:30pt;margin:0 0 6mm;letter-spacing:-.5pt}
+    .g{display:grid;grid-template-columns:1fr 1fr;gap:6mm}
+    .c{border:2.5pt solid #111;border-radius:6mm;padding:5mm;display:flex;gap:5mm;align-items:center;break-inside:avoid}
+    .n{font-size:22pt;font-weight:800;width:14mm;flex:none}
+    .i{font-size:40pt;line-height:1}
+    .i img{width:26mm;height:26mm;object-fit:cover;border-radius:4mm}
+    .l{font-size:19pt;font-weight:700;line-height:1.2}
+    p.f{margin-top:8mm;font-size:11pt;color:#555}
+  </style></head><body>
+  <h1>${t.name}</h1>
+  <div class="g">${(t.steps||[]).map((s,i)=>`<div class="c"><div class="n">${i+1}</div>
+    <div class="i">${s.photo?`<img src="${s.photo}">`:s.icon}</div><div class="l">${s.label}</div></div>`).join('')}</div>
+  <p class="f">Print, laminate, and hang it where she'll use it.</p>
+  </body></html>`);
+  w.document.close(); setTimeout(()=>w.print(),400);
+}
+
+function shrink(file,cb){
+  if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{ const img=new Image(); img.onload=()=>{
+    const s=Math.min(img.width,img.height), cv=document.createElement('canvas');
+    cv.width=cv.height=256;
+    cv.getContext('2d').drawImage(img,(img.width-s)/2,(img.height-s)/2,s,s,0,0,256,256);
+    cb(cv.toDataURL('image/jpeg',.72));
+  }; img.src=r.result; };
+  r.readAsDataURL(file);
+}
+
+async function saveConfig(){
+  if(!API||!HOUSE||!CARE){ alert('Add the worker address, household code, and caregiver key first.'); return; }
+  try{ await post('/config',{config:CFG}); LS.set('config',CFG); setConn(true); }
+  catch(e){ alert('Could not save: '+e.message); }
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',async e=>{
+  const t=e.target;
+  const tb=t.closest('[data-tab]');
+  if(tb){ tab=tb.dataset.tab; sub=null; render(); if(tab==='msgs'){ const ids=MSGS.filter(m=>(m.dir==='out'||m.dir==='alert')&&!m.seen).map(m=>m.id); if(ids.length) post('/seen',{ids}).then(pull).catch(()=>{}); } return; }
+
+  if(t.id==='saveConn'){
+    API=document.getElementById('sApi').value.trim();
+    HOUSE=document.getElementById('sHouse').value.trim();
+    CARE=document.getElementById('sCare').value.trim();
+    LS.set('api',API); LS.set('house',HOUSE); LS.set('care',CARE);
+    if(!CFG) CFG=blank();
+    await saveConfig(); await pull(); return;
+  }
+  if(t.id==='saveName'){
+    CFG=CFG||blank();
+    CFG.name=document.getElementById('sName').value.trim();
+    CFG.ntfy=document.getElementById('sNtfy').value.trim();
+    CFG.speechRate=parseFloat(document.getElementById('sRate').value);
+    await saveConfig(); render(); return;
+  }
+  if(t.id==='saveMe'){ ME=document.getElementById('sMe').value; LS.set('me',ME); render(); return; }
+  if(t.id==='invite'){
+    const who=prompt('Invite link for which person? (their exact name)');
+    if(!who) return;
+    const link=location.origin+location.pathname+'#api='+encodeURIComponent(API)+'&house='+encodeURIComponent(HOUSE)+'&care='+encodeURIComponent(CARE)+'&me='+encodeURIComponent(who);
+    navigator.clipboard.writeText(link).then(()=>alert('Copied. Send it to '+who+' privately — it contains the caregiver key.'),()=>prompt('Copy this:',link));
+    return;
+  }
+  const ak=t.closest('[data-ack]');
+  if(ak){ try{ await post('/ack',{id:+ak.dataset.ack, me:ME||'Someone'}); await pull(); }catch(e){ alert(e.message); } return; }
+  if(t.id==='saveRules'){
+    CFG=CFG||blank();
+    CFG.snoozeMinutes=+document.getElementById('sSnooze').value;
+    CFG.maxSnoozes=+document.getElementById('sMax').value;
+    CFG.helpFallbackMinutes=+document.getElementById('sFallback').value;
+    CFG.nudgeTo=document.getElementById('sNudge').value;
+    await saveConfig(); render(); return;
+  }
+  if(t.id==='askNotif'){ if('Notification' in window) Notification.requestPermission().then(p=>{ t.textContent = p==='granted'?'✓ Notifications are on':'Blocked in phone settings'; }); return; }
+
+  if(t.id==='ciAsk'){
+    try{ await post('/checkin',{me:ME||'Someone'}); alert('Asked. She will see it on her tablet.'); }
+    catch(e){ alert(e.message); }
+    return;
+  }
+  if(t.id==='ciCall'){ beginCall(); return; }
+  if(t.id==='cHang'){ hangUp(); return; }
+  const ph=t.closest('[data-photo]');
+  if(ph){
+    try{
+      const r=await fetch(API.replace(/\/$/,'')+'/photo-get?house='+encodeURIComponent(HOUSE)+'&id='+ph.dataset.photo);
+      const d=await r.json();
+      const lb=document.getElementById('lightbox');
+      lb.innerHTML=`<img src="${d.data}">`; lb.classList.remove('hide');
+    }catch(e){ alert('Could not load that photo.'); }
+    return;
+  }
+  if(t.closest('#lightbox')){ document.getElementById('lightbox').classList.add('hide'); return; }
+  const q=t.closest('[data-q]'); if(q){ document.getElementById('reply').value=q.dataset.q; return; }
+  if(t.id==='sendBtn'){
+    const box=document.getElementById('reply'), text=box.value.trim();
+    if(!text) return;
+    try{ await post('/reply',{who:ME||'Someone',text,icon:'💬'}); box.value=''; await pull(); }
+    catch(err){ alert('Could not send: '+err.message); }
+    return;
+  }
+
+  const et=t.closest('[data-etask]');
+  if(et){
+    CFG=CFG||blank();
+    draft = et.dataset.etask==='new'
+      ? {_new:true,id:uid(),name:'',icon:'🪥',photo:null,time:'08:00',freq:'daily',days:[],timer:0,outfit:false,rollover:false,warn:5,preview:false,steps:[]}
+      : Object.assign({},CFG.tasks.find(x=>x.id===et.dataset.etask));
+    draft.steps=JSON.parse(JSON.stringify(draft.steps||[]));
+    sub='task'; render(); return;
+  }
+  const ec=t.closest('[data-econ]');
+  if(ec){
+    CFG=CFG||blank();
+    draft = ec.dataset.econ==='new'
+      ? {_new:true,id:uid(),name:'',icon:'👩',photo:null,ntfy:'',busyDays:[],override:'auto',escalate:true,fallback:false,grace:null}
+      : Object.assign({},CFG.contacts.find(x=>x.id===ec.dataset.econ));
+    draft.busyDays=(draft.busy&&draft.busy.days)||[];
+    sub='contact'; render(); return;
+  }
+  const ee=t.closest('[data-eev]');
+  if(ee){
+    CFG=CFG||blank(); CFG.events=CFG.events||[];
+    draft = ee.dataset.eev==='new'
+      ? {_new:true,id:uid(),title:'',icon:'📅',photo:null,kind:'weekly',days:[],date:'',from:'',to:'',warn:15,items:[],big:false,away:false}
+      : JSON.parse(JSON.stringify(CFG.events.find(x=>x.id===ee.dataset.eev)));
+    draft.items=draft.items||[]; sub='event'; render(); return;
+  }
+  if(t.id==='kWeek'){ draft.kind='weekly'; document.getElementById('kW').classList.remove('hide'); document.getElementById('kD').classList.add('hide');
+    t.setAttribute('aria-pressed',true); document.getElementById('kDate').setAttribute('aria-pressed',false); return; }
+  if(t.id==='kDate'){ draft.kind='date'; document.getElementById('kD').classList.remove('hide'); document.getElementById('kW').classList.add('hide');
+    t.setAttribute('aria-pressed',true); document.getElementById('kWeek').setAttribute('aria-pressed',false); return; }
+  const ed=t.closest('[data-eday]');
+  if(ed){ draft.days=draft.days||[]; const d=+ed.dataset.eday, i=draft.days.indexOf(d);
+    if(i>-1) draft.days.splice(i,1); else draft.days.push(d); ed.setAttribute('aria-pressed',draft.days.includes(d)); return; }
+  if(t.id==='dItemAdd'){ const inp=document.getElementById('dItemNew'), v=inp.value.trim();
+    if(!v) return; draft.items=draft.items||[]; draft.items.push({icon:'•',label:v}); inp.value=''; render(); return; }
+  const itd=t.closest('[data-itdel]');
+  if(itd){ draft.items=draft.items.filter(x=>x.label!==itd.dataset.itdel); render(); return; }
+  if(t.id==='dAway'){ draft.away=!draft.away; t.setAttribute('aria-pressed',draft.away); t.textContent=draft.away?'Out, tablet stays home':'At home'; return; }
+  if(t.id==='dBig'){ draft.big=!draft.big; t.setAttribute('aria-pressed',draft.big); t.textContent=draft.big?'Stands out':'Normal'; return; }
+  const ew=t.closest('[data-eward]');
+  if(ew){
+    CFG=CFG||blank(); CFG.wardrobe=CFG.wardrobe||[];
+    draft = ew.dataset.eward==='new'
+      ? {_new:true,id:uid(),name:'',icon:'🧥',photo:null,layer:'outer',minF:20,maxF:55,rain:false}
+      : Object.assign({},CFG.wardrobe.find(x=>x.id===ew.dataset.eward));
+    sub='ward'; render(); return;
+  }
+  const bd=t.closest('[data-bday]');
+  if(bd){ draft.busyDays=draft.busyDays||[]; const d=+bd.dataset.bday, i=draft.busyDays.indexOf(d);
+    if(i>-1) draft.busyDays.splice(i,1); else draft.busyDays.push(d);
+    bd.setAttribute('aria-pressed',draft.busyDays.includes(d)); return; }
+  const ov=t.closest('[data-ov]');
+  if(ov){ draft.override=ov.dataset.ov;
+    document.querySelectorAll('[data-ov]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.ov===draft.override)); return; }
+  if(t.id==='dStepAdd'){
+    const inp=document.getElementById('dStepNew'), v=inp.value.trim();
+    if(!v) return;
+    draft.steps=draft.steps||[];
+    const guess=['👕','🚿','💧','🧴','🧼','🧻','🪥','🥛','🛑','🧦','👖','🪮','🧺','🍽️','🥣','🚽','🧹','🧽','✅','➡️'];
+    draft.steps.push({id:uid(),label:v,icon:guess[draft.steps.length%guess.length],photo:null});
+    inp.value=''; render(); return;
+  }
+  const sd=t.closest('[data-stepdel]');
+  if(sd){ draft.steps=draft.steps.filter(x=>x.id!==sd.dataset.stepdel); render(); return; }
+  const su=t.closest('[data-stepup]');
+  if(su){ const i=draft.steps.findIndex(x=>x.id===su.dataset.stepup);
+    if(i>0){ const a=draft.steps[i-1]; draft.steps[i-1]=draft.steps[i]; draft.steps[i]=a; render(); } return; }
+  if(t.id==='dPrev2'){ draft.preview=!draft.preview; t.setAttribute('aria-pressed',draft.preview);
+    t.textContent=draft.preview?'Show steps, then leave the tablet':'Tablet stays with her'; return; }
+  if(t.id==='dPrint'){ printSteps(draft); return; }
+  if(t.id==='dRoll'){ draft.rollover=!draft.rollover; t.setAttribute('aria-pressed',draft.rollover); t.textContent=draft.rollover?'Keep it on the list':'Wait for next week'; return; }
+  if(t.id==='dEsc'){ draft.escalate=draft.escalate===false; t.setAttribute('aria-pressed',draft.escalate); t.textContent=draft.escalate?'On the ladder':'Never chased'; return; }
+  if(t.id==='dFall'){ draft.fallback=!draft.fallback; t.setAttribute('aria-pressed',draft.fallback); t.textContent=draft.fallback?'Always shown':'Follows schedule'; return; }
+  if(t.id==='dOutfit'){ draft.outfit=!draft.outfit; t.setAttribute('aria-pressed',draft.outfit); t.textContent=draft.outfit?'Shows the weather and her clothes':'Ordinary task'; return; }
+  if(t.id==='dRain'){ draft.rain=!draft.rain; t.setAttribute('aria-pressed',draft.rain); t.textContent=draft.rain?'Rain only':'Any weather'; return; }
+  if(t.id==='saveWx'){
+    CFG=CFG||blank();
+    CFG.place=document.getElementById('sPlace').value.trim();
+    CFG.lat=parseFloat(document.getElementById('sLat').value);
+    CFG.lon=parseFloat(document.getElementById('sLon').value);
+    await saveConfig(); render(); return;
+  }
+  const ep=t.closest('[data-ephr]');
+  if(ep){
+    CFG=CFG||blank();
+    draft = ep.dataset.ephr==='new'
+      ? {_new:true,id:uid(),text:'',icon:'👋'}
+      : Object.assign({},CFG.phrases.find(x=>x.id===ep.dataset.ephr));
+    sub='phrase'; render(); return;
+  }
+
+  const ic=t.closest('#dIcons [data-i]');
+  if(ic){
+    draft.icon=ic.dataset.i; draft.photo=null;
+    document.querySelectorAll('#dIcons button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.i===draft.icon));
+    const p=document.getElementById('dPrev'); if(p) p.innerHTML=draft.icon;
+    return;
+  }
+  if(t.id==='dPhoto'){ document.getElementById('dFile').click(); return; }
+  if(t.id==='dNoPhoto'){ draft.photo=null; document.getElementById('dPrev').innerHTML=draft.icon; return; }
+  if(t.id==='fD'){ draft.freq='daily'; document.getElementById('fD').setAttribute('aria-pressed',true); document.getElementById('fW').setAttribute('aria-pressed',false); document.getElementById('dDays').classList.add('hide'); return; }
+  if(t.id==='fW'){ draft.freq='weekly'; document.getElementById('fW').setAttribute('aria-pressed',true); document.getElementById('fD').setAttribute('aria-pressed',false); document.getElementById('dDays').classList.remove('hide'); return; }
+  const dy=t.closest('[data-day]');
+  if(dy){
+    draft.days=draft.days||[];
+    const d=+dy.dataset.day, i=draft.days.indexOf(d);
+    if(i>-1) draft.days.splice(i,1); else draft.days.push(d);
+    dy.setAttribute('aria-pressed',draft.days.includes(d));
+    return;
+  }
+  if(t.id==='dCancel'){ sub=null; draft=null; render(); return; }
+
+  if(t.id==='dSave'){
+    const val=document.getElementById('dName').value.trim();
+    if(!val){ document.getElementById('dName').focus(); return; }
+    if(sub==='task'){
+      draft.name=val; draft.time=document.getElementById('dTime').value||'08:00';
+      draft.timer=+document.getElementById('dTimer').value||0;
+      if(draft.freq!=='weekly') draft.days=[];
+      const list=CFG.tasks, i=list.findIndex(x=>x.id===draft.id);
+      const rec={id:draft.id,name:draft.name,icon:draft.icon,photo:draft.photo,time:draft.time,freq:draft.freq,days:draft.days,timer:draft.timer||0,outfit:!!draft.outfit,rollover:!!draft.rollover,
+        warn:+document.getElementById('dWarn').value,preview:!!draft.preview,steps:draft.steps||[]};
+      if(i>-1) list[i]=rec; else list.push(rec);
+    }
+    if(sub==='contact'){
+      const g=document.getElementById('dGrace').value;
+      const rec={id:draft.id,name:val,icon:draft.icon,photo:draft.photo,
+        ntfy:(document.getElementById('dNtfy')||{}).value?.trim()||'',
+        busy:{days:draft.busyDays||[],from:document.getElementById('dFrom').value||'08:00',to:document.getElementById('dTo').value||'17:00'},
+        override:draft.override||'auto',
+        escalate:draft.escalate!==false,
+        fallback:!!draft.fallback,
+        grace:g===''?null:+g};
+      const i=CFG.contacts.findIndex(x=>x.id===draft.id);
+      if(i>-1) CFG.contacts[i]=rec; else CFG.contacts.push(rec);
+    }
+    if(sub==='event'){
+      CFG.events=CFG.events||[];
+      const rec={id:draft.id,title:val,icon:draft.icon,photo:draft.photo,kind:draft.kind||'weekly',
+        days:draft.days||[],date:document.getElementById('dDate')?document.getElementById('dDate').value:'',
+        from:document.getElementById('dFrom').value,to:document.getElementById('dTo').value,
+        warn:+document.getElementById('dEWarn').value,items:draft.items||[],big:!!draft.big,away:!!draft.away};
+      const i=CFG.events.findIndex(x=>x.id===draft.id);
+      if(i>-1) CFG.events[i]=rec; else CFG.events.push(rec);
+    }
+    if(sub==='ward'){
+      CFG.wardrobe=CFG.wardrobe||[];
+      const rec={id:draft.id,name:val,icon:draft.icon,photo:draft.photo,
+        layer:document.getElementById('dLayer').value,
+        minF:parseInt(document.getElementById('dMin').value,10)||0,
+        maxF:parseInt(document.getElementById('dMax').value,10)||120,
+        rain:!!draft.rain};
+      const i=CFG.wardrobe.findIndex(x=>x.id===draft.id);
+      if(i>-1) CFG.wardrobe[i]=rec; else CFG.wardrobe.push(rec);
+    }
+    if(sub==='phrase'){
+      const rec={id:draft.id,text:val,icon:draft.icon};
+      const i=CFG.phrases.findIndex(x=>x.id===draft.id);
+      if(i>-1) CFG.phrases[i]=rec; else CFG.phrases.push(rec);
+    }
+    await saveConfig(); sub=null; draft=null; render(); return;
+  }
+  if(t.id==='dDel'){
+    if(sub==='task') CFG.tasks=CFG.tasks.filter(x=>x.id!==draft.id);
+    if(sub==='contact') CFG.contacts=CFG.contacts.filter(x=>x.id!==draft.id);
+    if(sub==='phrase') CFG.phrases=CFG.phrases.filter(x=>x.id!==draft.id);
+    if(sub==='ward') CFG.wardrobe=CFG.wardrobe.filter(x=>x.id!==draft.id);
+    if(sub==='event') CFG.events=CFG.events.filter(x=>x.id!==draft.id);
+    await saveConfig(); sub=null; draft=null; render(); return;
+  }
+});
+
+document.addEventListener('change',e=>{
+  if(e.target.id==='dFile'){
+    shrink(e.target.files[0],d=>{ draft.photo=d; document.getElementById('dPrev').innerHTML=`<img src="${d}">`; });
+  }
+});
+
+/* ---------- video calling ---------- */
+let pc=null,localStream=null,room=null,side='a',since=0,poll=null;
+async function sig(kind,payload){ try{ await post('/signal',{room,side,kind,payload:JSON.stringify(payload||null)}); }catch(e){} }
+
+function callShell(state){
+  document.getElementById('callwrap').innerHTML=`
+    <div class="far"><video id="vFar" autoplay playsinline></video></div>
+    <div class="near"><video id="vNear" autoplay playsinline muted></video></div>
+    ${state?`<div class="st">${state}</div>`:''}
+    <div class="bar"><button class="hang" id="cHang">End call</button></div>`;
+  document.getElementById('callwrap').classList.remove('hide');
+  if(localStream) document.getElementById('vNear').srcObject=localStream;
+}
+
+async function beginCall(){
+  room='r'+Date.now()+Math.random().toString(36).slice(2,6); side='a'; since=0;
+  callShell('Ringing…');
+  try{ localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); }
+  catch(e){ alert('Could not open your camera: '+e.message); return hangUp(); }
+  document.getElementById('vNear').srcObject=localStream;
+
+  const ice=(CFG&&CFG.turn&&CFG.turn.urls)
+    ? [{urls:'stun:stun.l.google.com:19302'},CFG.turn]
+    : [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}];
+  pc=new RTCPeerConnection({iceServers:ice});
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.ontrack=e=>{ const f=document.getElementById('vFar'); if(f&&f.srcObject!==e.streams[0]){ callShell(''); document.getElementById('vFar').srcObject=e.streams[0]; document.getElementById('vNear').srcObject=localStream; } };
+  pc.onicecandidate=e=>{ if(e.candidate) sig('ice',e.candidate); };
+  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) hangUp(); };
+
+  const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
+  await sig('offer',offer);
+  await post('/call',{room,from:ME||'Someone',to:''}).catch(()=>{});
+  poll=setInterval(async()=>{
+    if(!room||!pc) return;
+    try{
+      const r=await fetch(API.replace(/\/$/,'')+'/signal?house='+encodeURIComponent(HOUSE)+'&room='+encodeURIComponent(room)+'&since='+since);
+      const d=await r.json();
+      for(const it of (d.items||[])){
+        since=Math.max(since,it.id);
+        if(it.side===side) continue;
+        const p=JSON.parse(it.payload||'null');
+        if(it.kind==='answer'&&!pc.currentRemoteDescription) await pc.setRemoteDescription(p);
+        else if(it.kind==='ice'&&p){ try{ await pc.addIceCandidate(p); }catch(e){} }
+        else if(it.kind==='end') hangUp();
+      }
+    }catch(e){}
+  },1200);
+}
+
+function hangUp(){
+  if(room) sig('end',null);
+  clearInterval(poll); poll=null;
+  if(pc){ try{pc.close();}catch(e){} pc=null; }
+  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  room=null;
+  const w=document.getElementById('callwrap'); w.classList.add('hide'); w.innerHTML='';
+}
+
+render(); pull();
+setInterval(()=>{ if(tab!=='setup') pull(); }, 15000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) pull(); });
+</script>
+</body>
+</html>

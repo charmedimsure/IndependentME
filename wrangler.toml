@@ -1,0 +1,12 @@
+name = "independentme"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Checks every minute for a help request nobody has claimed
+[triggers]
+crons = ["* * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "independentme-db"
+database_id = "9b9cb6b0-fe26-4342-8353-dd84447145d9"

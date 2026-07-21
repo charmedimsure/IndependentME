@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IndependentME · Setup</title>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Figtree:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#FBFAF7; --ink:#1C1D22; --soft:#6C7080; --line:#E2E0DA;
+  --mark:#1F5FD9; --ok:#12793C; --warn:#B4531B; --code:#22242C;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:'Figtree',system-ui,sans-serif;line-height:1.6}
+.wrap{max-width:760px;margin:0 auto;padding:40px 22px 120px}
+h1{font-family:'Bricolage Grotesque',sans-serif;font-size:40px;letter-spacing:-.03em;margin:0 0 6px}
+.lede{color:var(--soft);font-size:17px;font-weight:600;margin:0 0 8px}
+
+.progress{position:sticky;top:0;background:var(--paper);padding:16px 0 14px;border-bottom:1px solid var(--line);z-index:5;margin-bottom:8px}
+.pbar{height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.pfill{height:100%;background:var(--ok);width:0;transition:width .4s ease}
+.pnum{font-size:13px;font-weight:800;color:var(--soft);margin-top:8px;letter-spacing:.04em}
+
+.step{border-top:1px solid var(--line);padding:30px 0}
+.step:first-of-type{border-top:0}
+.shead{display:flex;gap:14px;align-items:flex-start}
+.tick{width:30px;height:30px;flex:none;border-radius:9px;border:2px solid var(--line);background:#fff;
+  display:grid;place-items:center;cursor:pointer;font-size:17px;color:transparent;margin-top:3px}
+.tick[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.stitle{font-family:'Bricolage Grotesque',sans-serif;font-size:25px;font-weight:800;letter-spacing:-.02em}
+.snum{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--mark);letter-spacing:.1em;display:block;margin-bottom:3px}
+.sbody{padding-left:44px}
+.step.done .sbody{opacity:.45}
+p{margin:12px 0}
+ul{margin:12px 0;padding-left:20px}
+li{margin:6px 0}
+
+pre{background:var(--code);color:#EDEFF5;border-radius:12px;padding:16px 46px 16px 16px;overflow-x:auto;
+  font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.7;position:relative;margin:14px 0}
+pre b{color:#7FD6A0;font-weight:400}
+.copy{position:absolute;top:10px;right:10px;background:rgba(255,255,255,.1);color:#fff;border:0;border-radius:8px;
+  padding:6px 10px;font-size:12px;font-weight:800;cursor:pointer;font-family:'Figtree',sans-serif}
+.copy:hover{background:rgba(255,255,255,.22)}
+code{background:#EFEDE6;padding:2px 6px;border-radius:5px;font-family:'JetBrains Mono',monospace;font-size:13.5px}
+
+.check{border-left:4px solid var(--ok);background:#F0F8F2;border-radius:0 12px 12px 0;padding:14px 16px;margin:16px 0}
+.check b{color:var(--ok);display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+.warn{border-left:4px solid var(--warn);background:#FDF4EC;border-radius:0 12px 12px 0;padding:14px 16px;margin:16px 0}
+.warn b{color:var(--warn);display:block;font-size:12px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px}
+.aside{color:var(--soft);font-size:14.5px;font-weight:600;border-left:3px solid var(--line);padding-left:14px;margin:16px 0}
+
+.field{margin:16px 0}
+.field label{display:block;font-size:12px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--soft);margin-bottom:6px}
+.field input{width:100%;padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:14px;
+  border:2px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.field input:focus{outline:none;border-color:var(--mark)}
+.field .hint{font-size:13px;color:var(--soft);font-weight:600;margin-top:6px}
+
+.tree{background:#fff;border:2px solid var(--line);border-radius:12px;padding:16px;
+  font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.9;white-space:pre}
+.reset{margin-top:50px;padding:12px 18px;border:2px solid var(--line);background:#fff;border-radius:10px;
+  font-weight:800;font-size:14px;cursor:pointer;color:var(--soft)}
+@media print{.progress,.copy,.reset,.tick{display:none}.sbody{opacity:1!important;padding-left:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Setting up IndependentME</h1>
+<p class="lede">Fifteen steps, about twenty minutes. Everything here is free.</p>
+<p class="lede" style="color:var(--ink)">Nothing you do reaches Karelynn until step 13. Up to that point you can get it wrong, redo it, and she never knows.</p>
+
+<div class="progress">
+  <div class="pbar"><div class="pfill" id="pfill"></div></div>
+  <div class="pnum" id="pnum">0 of 15 done</div>
+</div>
+
+<!-- 1 -->
+<div class="step" data-s="1">
+  <div class="shead"><button class="tick" data-t="1">✓</button>
+    <div><span class="snum">STEP 01</span><span class="stitle">Put the files in a folder</span></div></div>
+  <div class="sbody">
+    <p>Download all six files I gave you. Make a folder called <code>independentme</code> somewhere you'll find it again, and arrange them exactly like this:</p>
+    <div class="tree">independentme/
+├── worker.js
+├── wrangler.toml
+├── schema.sql
+└── docs/
+    ├── index.html      ← this is independentme.html, renamed
+    └── care.html</div>
+    <p>The <code>docs</code> folder is one you create. Renaming <code>independentme.html</code> to <code>index.html</code> is what makes her web address short and clean instead of ending in a filename.</p>
+    <p>You can leave <code>README.md</code> in the top folder or delete it. It doesn't affect anything.</p>
+  </div>
+</div>
+
+<!-- 2 -->
+<div class="step" data-s="2">
+  <div class="shead"><button class="tick" data-t="2">✓</button>
+    <div><span class="snum">STEP 02</span><span class="stitle">Open a terminal in that folder</span></div></div>
+  <div class="sbody">
+    <p><b>Windows:</b> open the <code>independentme</code> folder in File Explorer, click the address bar at the top, type <code>cmd</code>, press Enter.</p>
+    <p><b>Mac:</b> right-click the folder → Services → New Terminal at Folder.</p>
+    <p>A black or white text window opens. Type this and press Enter to confirm you're in the right place:</p>
+    <pre><b>dir</b>        <span style="color:#8E95A8">(Windows)</span>
+<b>ls</b>         <span style="color:#8E95A8">(Mac)</span><button class="copy">copy</button></pre>
+    <div class="check"><b>You should see</b>worker.js, wrangler.toml, schema.sql and docs listed. If you don't, you're in the wrong folder.</div>
+  </div>
+</div>
+
+<!-- 3 -->
+<div class="step" data-s="3">
+  <div class="shead"><button class="tick" data-t="3">✓</button>
+    <div><span class="snum">STEP 03</span><span class="stitle">Check you have Node</span></div></div>
+  <div class="sbody">
+    <p>In that same terminal window:</p>
+    <pre><b>node --version</b><button class="copy">copy</button></pre>
+    <div class="check"><b>You should see</b>A version number like <code>v20.11.0</code>. Anything v18 or higher is fine.</div>
+    <div class="warn"><b>If it says "not recognized"</b>Go to <b>nodejs.org</b>, download the LTS version, install it with all the defaults, then <b>close the terminal and open a new one</b>. It won't work in the old window.</div>
+  </div>
+</div>
+
+<!-- 4 -->
+<div class="step" data-s="4">
+  <div class="shead"><button class="tick" data-t="4">✓</button>
+    <div><span class="snum">STEP 04</span><span class="stitle">Make a Cloudflare account</span></div></div>
+  <div class="sbody">
+    <p>Go to <b>dash.cloudflare.com/sign-up</b> and make a free account. Email and password, confirm the email, done. You don't need a domain and you won't be asked for a card.</p>
+    <div class="aside">Cloudflare is where the small piece of server code lives — the thing that lets her tablet and your four phones see the same information. The free tier is far more than this will ever use.</div>
+  </div>
+</div>
+
+<!-- 5 -->
+<div class="step" data-s="5">
+  <div class="shead"><button class="tick" data-t="5">✓</button>
+    <div><span class="snum">STEP 05</span><span class="stitle">Install wrangler and sign in</span></div></div>
+  <div class="sbody">
+    <p>Back in the terminal:</p>
+    <pre><b>npm install -g wrangler</b><button class="copy">copy</button></pre>
+    <p>That takes a minute and prints a lot of text. Warnings in yellow are normal. Then:</p>
+    <pre><b>wrangler login</b><button class="copy">copy</button></pre>
+    <p>A browser window opens asking you to authorise it. Click <b>Allow</b>.</p>
+    <div class="check"><b>You should see</b>The terminal says you're logged in successfully.</div>
+  </div>
+</div>
+
+<!-- 6 -->
+<div class="step" data-s="6">
+  <div class="shead"><button class="tick" data-t="6">✓</button>
+    <div><span class="snum">STEP 06</span><span class="stitle">Create the database</span></div></div>
+  <div class="sbody">
+    <pre><b>wrangler d1 create independentme-db</b><button class="copy">copy</button></pre>
+    <p>It prints a small block of text ending in a long <code>database_id</code> — a string of letters, numbers and dashes. Copy that ID and paste it here so the rest of this guide can use it:</p>
+    <div class="field">
+      <label>Your database_id</label>
+      <input id="fDb" placeholder="e.g. 8a1f2c40-93bb-4e77-a0c2-6d5e4b1c9f33">
+      <div class="hint">Saved on this page only. Nothing is sent anywhere.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 7 -->
+<div class="step" data-s="7">
+  <div class="shead"><button class="tick" data-t="7">✓</button>
+    <div><span class="snum">STEP 07</span><span class="stitle">Put the ID into wrangler.toml</span></div></div>
+  <div class="sbody">
+    <p>Open <code>wrangler.toml</code> in Notepad or TextEdit. Find the last line:</p>
+    <pre>database_id = "PASTE_THE_ID_WRANGLER_PRINTS_HERE"</pre>
+    <p>Replace it with yours, keeping the quote marks:</p>
+    <pre id="dbLine">database_id = "<b>your-id-here</b>"<button class="copy">copy</button></pre>
+    <p>Save the file and close it.</p>
+    <div class="warn"><b>Watch out</b>If you're on Mac and used TextEdit, make sure it saved as plain text, not rich text.</div>
+  </div>
+</div>
+
+<!-- 8 -->
+<div class="step" data-s="8">
+  <div class="shead"><button class="tick" data-t="8">✓</button>
+    <div><span class="snum">STEP 08</span><span class="stitle">Build the tables</span></div></div>
+  <div class="sbody">
+    <pre><b>wrangler d1 execute independentme-db --remote --file=./schema.sql</b><button class="copy">copy</button></pre>
+    <p>It'll ask you to confirm. Type <code>y</code> and press Enter.</p>
+    <div class="warn"><b>The one thing not to skip</b>That <code>--remote</code> is doing real work. Without it, the tables get built in a practice copy on your own computer, everything looks like it worked, and then nothing ever saves. If you're unsure whether you included it, just run the command again — running it twice is harmless.</div>
+    <div class="check"><b>You should see</b>Three or four commands executed successfully.</div>
+  </div>
+</div>
+
+<!-- 9 -->
+<div class="step" data-s="9">
+  <div class="shead"><button class="tick" data-t="9">✓</button>
+    <div><span class="snum">STEP 09</span><span class="stitle">Deploy the worker</span></div></div>
+  <div class="sbody">
+    <pre><b>wrangler deploy</b><button class="copy">copy</button></pre>
+    <p>It prints a web address ending in <code>.workers.dev</code>. Paste it here:</p>
+    <div class="field">
+      <label>Your worker address</label>
+      <input id="fApi" placeholder="https://independentme.something.workers.dev">
+    </div>
+    <p>Now open that address in a browser.</p>
+    <div class="check"><b>You should see</b><code>{"service":"IndependentME","ok":true}</code> — plain text on a white page. That's the whole backend, working.</div>
+    <div class="warn"><b>If you get an error page</b>Read what the terminal said during deploy. Paste it to me and I'll tell you what it means.</div>
+  </div>
+</div>
+
+<!-- 10 -->
+<div class="step" data-s="10">
+  <div class="shead"><button class="tick" data-t="10">✓</button>
+    <div><span class="snum">STEP 10</span><span class="stitle">Put the two apps online</span></div></div>
+  <div class="sbody">
+    <p>On GitHub, make a new repository called <code>independentme</code>. Public is fine — the codes are what keep it private, not the repository setting.</p>
+    <p>Upload the folder contents. Easiest way if you'd rather not use git: on the empty repo page click <b>uploading an existing file</b>, then drag in <code>worker.js</code>, <code>wrangler.toml</code>, <code>schema.sql</code>, and the whole <code>docs</code> folder.</p>
+    <p>Then <b>Settings → Pages</b>. Under Source pick <b>Deploy from a branch</b>, branch <code>main</code>, folder <code>/docs</code>. Save.</p>
+    <p>Wait about a minute, then refresh that page — it'll show your address at the top.</p>
+    <div class="field">
+      <label>Your GitHub Pages address</label>
+      <input id="fPages" placeholder="https://yourname.github.io/independentme/">
+    </div>
+    <div class="check"><b>You should see</b>Opening that address shows her app saying <i>"Not set up yet."</i> That's exactly right. Adding <code>care.html</code> to the end shows the dark caregiver app.</div>
+  </div>
+</div>
+
+<!-- 11 -->
+<div class="step" data-s="11">
+  <div class="shead"><button class="tick" data-t="11">✓</button>
+    <div><span class="snum">STEP 11</span><span class="stitle">Choose your two codes</span></div></div>
+  <div class="sbody">
+    <p>Make these up now. Longer is better.</p>
+    <div class="field">
+      <label>Household code</label>
+      <input id="fHouse" placeholder="karelynn-home-7f3a">
+      <div class="hint">Goes on the tablet and all four phones.</div>
+    </div>
+    <div class="field">
+      <label>Caregiver key</label>
+      <input id="fCare" placeholder="something long and private">
+      <div class="hint">Phones only, never the tablet. This is what allows changes.</div>
+    </div>
+    <div class="aside">Write them down somewhere that isn't a group chat. There's no password reset — if you lose these you'd start over, which costs about ten minutes.</div>
+  </div>
+</div>
+
+<!-- 12 -->
+<div class="step" data-s="12">
+  <div class="shead"><button class="tick" data-t="12">✓</button>
+    <div><span class="snum">STEP 12</span><span class="stitle">Set up your phone</span></div></div>
+  <div class="sbody">
+    <p>On your phone, open <span id="careUrl"><code>your-pages-address/care.html</code></span>. Go to the <b>Setup</b> tab and fill in all three: worker address, household code, caregiver key. Tap Save and connect.</p>
+    <div class="check"><b>You should see</b>The dot at the top right turns green and says <b>connected</b>. Now check the <b>Today</b> tab — a list of tasks should be there. That means the database took the write. This is the moment it all becomes real.</div>
+    <div class="warn"><b>If the dot stays red</b>Almost always a typo in the worker address. It needs the <code>https://</code> and no slash on the end.</div>
+    <p>While you're here: add IndependentME to your phone's home screen so you're not hunting for a browser tab. Then set her name, and go through the task list — times, timers, what's daily versus weekly.</p>
+  </div>
+</div>
+
+<!-- 13 -->
+<div class="step" data-s="13">
+  <div class="shead"><button class="tick" data-t="13">✓</button>
+    <div><span class="snum">STEP 13</span><span class="stitle">Add the four of you</span></div></div>
+  <div class="sbody">
+    <p>Install <b>ntfy</b> from the Play Store or App Store on each phone. It's free and needs no account. Each person picks a topic name — make them long and random, like <code>nan-km-4k2p9</code> — and subscribes to it in the app.</p>
+    <p>In Setup → People, add yourself, Seth, Shelby and Nan. Give each one their topic and an emoji or photo. Then set <b>who you are on this device</b>.</p>
+    <p>Now use <b>Copy an invite link</b> for each of the other three. That link has everything pre-filled including their name, so they tap it once and they're set up.</p>
+    <div class="warn"><b>Send those individually</b>The invite link contains the caregiver key. Person to person, not to a group thread.</div>
+    <div class="aside">Do the topics before the invite links. The link carries the setup as it exists when you generate it.</div>
+  </div>
+</div>
+
+<!-- 14 -->
+<div class="step" data-s="14">
+  <div class="shead"><button class="tick" data-t="14">✓</button>
+    <div><span class="snum">STEP 14</span><span class="stitle">Set up her tablet</span></div></div>
+  <div class="sbody">
+    <p>On the tablet, in Chrome, open <span id="tabUrl"><code>your-pages-address</code></span>.</p>
+    <p>Press and hold the faint grey gear in the top right corner for about a second. The setup panel appears. Enter <b>only</b> the worker address and household code — the tablet never gets the caregiver key. Tap Save and connect.</p>
+    <div class="check"><b>You should see</b>Her whole day appears — weather at the top, tasks below, sun on the arc. If it's morning the screen is amber; evening, deep purple.</div>
+    <p>Then, in order:</p>
+    <ul>
+      <li>Tap <b>Turn on notifications</b> and allow it</li>
+      <li>Chrome menu → <b>Add to Home Screen</b>, then open it from that icon</li>
+      <li>Settings → Display → Screen timeout → the longest option</li>
+      <li>Settings → Security → <b>App pinning</b> → turn on. Open IndependentME, tap the Recents button, tap the app's icon, choose Pin. Home and Recents now need a PIN.</li>
+      <li>Plug it in and leave it plugged in</li>
+    </ul>
+  </div>
+</div>
+
+<!-- 15 -->
+<div class="step" data-s="15">
+  <div class="shead"><button class="tick" data-t="15">✓</button>
+    <div><span class="snum">STEP 15</span><span class="stitle">Test it before she relies on it</span></div></div>
+  <div class="sbody">
+    <p>Do this yourself, on both devices, before you show her.</p>
+    <ul>
+      <li><b>A task.</b> On your phone set some task to two minutes from now. Wait. The tablet should take over the whole screen and say it out loud.</li>
+      <li><b>The timer.</b> Start brushing teeth on the tablet. The ring should drain and it should check itself off at the end.</li>
+      <li><b>A message.</b> Send one from the tablet to yourself. It should land in your care app, and your ntfy should buzz.</li>
+      <li><b>A reply.</b> Answer from your phone. It should appear on the tablet and be read aloud.</li>
+      <li><b>Help.</b> Trigger an alarm, tap Not yet until the help button appears, ask someone. Their phone should buzz. Tap <b>I've got this</b> and the tablet should say they're coming.</li>
+      <li><b>Offline.</b> Turn the wifi off on the tablet. Her day should still be there and still be tappable. Turn it back on and your phone should catch up.</li>
+    </ul>
+    <div class="check"><b>Once those all pass</b>You're done. Anything that failed, tell me which one and what happened — that's usually enough for me to name the cause.</div>
+  </div>
+</div>
+
+<button class="reset" id="reset">Clear my progress</button>
+</div>
+
+<script>
+const S={
+  get(k,d){try{const v=localStorage.getItem('imeg.'+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem('imeg.'+k,JSON.stringify(v))}catch(e){}}
+};
+let done=S.get('done',{}), vals=S.get('vals',{});
+
+function paint(){
+  let n=0;
+  document.querySelectorAll('.step').forEach(st=>{
+    const id=st.dataset.s, is=!!done[id];
+    st.classList.toggle('done',is);
+    st.querySelector('.tick').setAttribute('aria-pressed',is);
+    if(is) n++;
+  });
+  document.getElementById('pfill').style.width=(n/15*100)+'%';
+  document.getElementById('pnum').textContent=n+' of 15 done';
+}
+
+// live substitution so nothing has to be retyped from memory
+function fill(){
+  const db=vals.fDb||'your-id-here';
+  document.getElementById('dbLine').innerHTML=
+    'database_id = "<b>'+db.replace(/[<>]/g,'')+'</b>"<button class="copy">copy</button>';
+  const pages=(vals.fPages||'').replace(/\/+$/,'');
+  document.getElementById('careUrl').innerHTML = pages
+    ? '<code>'+pages+'/care.html</code>' : '<code>your-pages-address/care.html</code>';
+  document.getElementById('tabUrl').innerHTML = pages
+    ? '<code>'+pages+'/</code>' : '<code>your-pages-address</code>';
+}
+
+['fDb','fApi','fPages','fHouse','fCare'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.value=vals[id]||'';
+  el.addEventListener('input',()=>{ vals[id]=el.value.trim(); S.set('vals',vals); fill(); });
+});
+
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-t]');
+  if(t){ const id=t.dataset.t; done[id]=!done[id]; S.set('done',done); paint(); return; }
+  if(e.target.classList.contains('copy')){
+    const txt=e.target.parentElement.innerText.replace(/copy$/,'').trim();
+    navigator.clipboard.writeText(txt).then(()=>{
+      e.target.textContent='copied'; setTimeout(()=>e.target.textContent='copy',1200);
+    });
+    return;
+  }
+  if(e.target.id==='reset'){
+    if(confirm('Clear your ticks and saved values?')){ done={}; vals={}; S.set('done',done); S.set('vals',vals);
+      ['fDb','fApi','fPages','fHouse','fCare'].forEach(i=>document.getElementById(i).value=''); paint(); fill(); }
+  }
+});
+
+paint(); fill();
+</script>
+</body>
+</html>

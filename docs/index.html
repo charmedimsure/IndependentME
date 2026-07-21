@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#F4C77E">
+<meta name="mobile-web-app-capable" content="yes">
+<title>IndependentME</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   IndependentME · tablet
+   The screen tells time by color: amber morning, blue afternoon,
+   plum evening. Nothing here requires reading a clock or a word.
+   ============================================================ */
+:root{
+  --display:'Bricolage Grotesque',system-ui,sans-serif;
+  --body:'Figtree',system-ui,-apple-system,sans-serif;
+  --sky-1:#FFE6B8; --sky-2:#F4C77E;
+  --ink:#22201C; --ink-soft:#6B6459;
+  --surface:#FFFFFF; --line:rgba(34,32,28,.12);
+  --done:#12793C; --done-soft:#DFF3E5;
+  --alert:#C4341F;
+  --shadow:0 2px 0 rgba(34,32,28,.06),0 16px 34px -16px rgba(34,32,28,.4);
+}
+body[data-part="afternoon"]{--sky-1:#D7ECF8;--sky-2:#9CCBE8}
+body[data-part="evening"]{
+  --sky-1:#3E3466;--sky-2:#241F42;--ink:#F6F3FF;--ink-soft:#B6AEDA;
+  --surface:#332C57;--line:rgba(255,255,255,.16);--done-soft:#1D4A31;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  font-family:var(--body);color:var(--ink);
+  background:linear-gradient(178deg,var(--sky-1),var(--sky-2) 78%);
+  background-attachment:fixed;transition:background 1.2s ease;overscroll-behavior-y:contain;
+}
+button{font-family:inherit;color:inherit;border:0;background:none;cursor:pointer}
+h1,h2,h3{font-family:var(--display);font-weight:800;letter-spacing:-.02em;margin:0}
+.wrap{max-width:1000px;margin:0 auto;padding:0 22px 150px;padding-top:env(safe-area-inset-top)}
+.hide{display:none!important}
+
+.arc{position:relative;height:110px;margin:14px 0 4px}
+.arc svg{width:100%;height:100%;overflow:visible}
+.arc-path{fill:none;stroke:var(--ink);opacity:.22;stroke-width:2.5;stroke-linecap:round;stroke-dasharray:1 9}
+.arc-sun{fill:var(--surface);stroke:var(--ink);stroke-width:3}
+.arc-dot{fill:var(--ink);opacity:.3}
+.arc-dot.done{fill:var(--done);opacity:1}
+
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:14px;padding:6px 4px 20px}
+.hello{font-size:44px;line-height:1.02}
+.hello small{display:block;font-family:var(--body);font-weight:600;font-size:18px;color:var(--ink-soft);letter-spacing:0;margin-top:8px}
+.clock{font-family:var(--display);font-weight:600;font-size:38px;text-align:right;line-height:1}
+.clock span{display:block;font-family:var(--body);font-size:13px;font-weight:600;color:var(--ink-soft);margin-top:7px;text-transform:uppercase;letter-spacing:.1em}
+
+.group-label{font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin:28px 6px 12px;display:flex;align-items:center;gap:12px}
+.group-label:after{content:"";flex:1;height:1px;background:var(--line)}
+.cards{display:grid;grid-template-columns:1fr;gap:16px}
+@media(min-width:760px){.cards{grid-template-columns:1fr 1fr}}
+
+.card{display:flex;align-items:center;gap:18px;background:var(--surface);border-radius:28px;box-shadow:var(--shadow);padding:16px;animation:rise .35s cubic-bezier(.2,.8,.3,1) backwards}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}}
+.card.is-done{opacity:.5;box-shadow:none}
+.card.is-due{outline:3px solid var(--alert);outline-offset:-3px}
+.pic{width:112px;height:112px;border-radius:22px;flex:none;display:grid;place-items:center;font-size:60px;line-height:1;background:linear-gradient(160deg,var(--sky-1),var(--sky-2));overflow:hidden}
+.pic img{width:100%;height:100%;object-fit:cover}
+.cbody{flex:1;min-width:0}
+.cname{font-family:var(--display);font-weight:800;font-size:29px;line-height:1.05;word-break:break-word}
+.cwhen{font-size:16px;font-weight:600;color:var(--ink-soft);margin-top:6px}
+.crow{display:flex;gap:9px;margin-top:12px}
+.tick{width:84px;height:84px;flex:none;border-radius:26px;background:var(--done);display:grid;place-items:center;box-shadow:0 5px 0 rgba(0,0,0,.18);transition:transform .08s}
+.tick:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.18)}
+.tick svg{width:44px;height:44px;stroke:#fff;stroke-width:4.5;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.card.is-done .tick{background:var(--done-soft)}
+.card.is-done .tick svg{stroke:var(--done)}
+.mini{width:50px;height:50px;border-radius:16px;display:grid;place-items:center;border:2px solid var(--line);font-size:23px}
+.mini:active{background:var(--line)}
+
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:40;padding:14px 22px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--sky-2) 55%,transparent)}
+.bar-in{max-width:1000px;margin:0 auto;display:flex;gap:12px}
+.tab{flex:1;background:var(--surface);border-radius:24px;box-shadow:var(--shadow);padding:15px 8px 13px;display:grid;place-items:center;gap:5px;font-size:15px;font-weight:800;position:relative}
+.tab em{font-style:normal;font-size:32px;line-height:1}
+.tab[aria-current="true"]{background:var(--ink);color:var(--sky-1)}
+.badge{position:absolute;top:10px;right:calc(50% - 46px);min-width:26px;height:26px;border-radius:13px;background:var(--alert);color:#fff;font-size:14px;display:grid;place-items:center;padding:0 7px}
+
+.cheer{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:rgba(18,121,60,.94);color:#fff;text-align:center;padding:24px}
+.cheer h2{font-size:60px;line-height:1}
+.cheer p{font-size:23px;font-weight:600;margin:16px 0 0;opacity:.9}
+.cheer .big{font-size:130px;animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.3);opacity:0}}
+
+.grid2{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+.person{background:var(--surface);border-radius:28px;box-shadow:var(--shadow);padding:18px 12px;display:grid;place-items:center;gap:12px;text-align:center}
+.person .pic{width:110px;height:110px;border-radius:50%}
+.person b{font-family:var(--display);font-size:23px}
+.say{width:100%;background:var(--surface);border-radius:24px;box-shadow:var(--shadow);padding:18px;display:flex;align-items:center;gap:16px;margin-bottom:14px;text-align:left}
+.say em{font-style:normal;font-size:46px;line-height:1}
+.say b{font-family:var(--display);font-size:25px;font-weight:800}
+.bubble{background:var(--surface);border-radius:26px;box-shadow:var(--shadow);padding:20px;margin-bottom:14px;display:flex;gap:16px;align-items:flex-start}
+.bubble.mine{background:transparent;box-shadow:none;border:2px dashed var(--line);opacity:.75}
+.bubble .who{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-soft)}
+.bubble .txt{font-family:var(--display);font-size:26px;font-weight:800;line-height:1.2;margin-top:6px}
+.bubble .hear{margin-top:12px;padding:11px 16px;border-radius:14px;border:2px solid var(--line);font-weight:800;font-size:16px}
+
+.sheet{position:fixed;inset:0;z-index:70;background:var(--sky-1);overflow-y:auto;padding:0 22px 60px;padding-top:calc(20px + env(safe-area-inset-top))}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;padding:8px 0 20px}
+.panel{background:var(--surface);border-radius:22px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow);max-width:560px}
+.panel h3{font-size:14px;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-soft);margin-bottom:16px}
+label.f{display:block;font-size:13px;font-weight:800;color:var(--ink-soft);margin:16px 0 7px;text-transform:uppercase;letter-spacing:.07em}
+input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(--ink);background:transparent;border:2px solid var(--line);border-radius:14px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:15px 18px;border-radius:16px;font-weight:800;font-size:17px;background:var(--ink);color:var(--sky-1);width:100%}
+.btn.ghost{background:transparent;color:var(--ink);border:2px solid var(--line)}
+.row{display:flex;gap:10px}
+.chip{padding:12px;border-radius:13px;border:2px solid var(--line);font-weight:800;font-size:15px;flex:1;text-align:center}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--sky-1);border-color:var(--ink)}
+.note{font-size:13.5px;color:var(--ink-soft);line-height:1.55;font-weight:600}
+.empty{text-align:center;padding:60px 20px;color:var(--ink-soft);font-weight:600;font-size:18px}
+.empty em{font-style:normal;display:block;font-size:70px;margin-bottom:16px}
+/* ---- full-screen alarm. No close button, no swipe, no edges to escape from.
+       It ends when she taps I did it, or when it hands her to a person. ---- */
+.alarm{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:28px;text-align:center;background:linear-gradient(170deg,#FFF3DA,#F4C77E);color:#22201C;
+  animation:wake .5s ease}
+@keyframes wake{from{opacity:0;transform:scale(1.04)}}
+.alarm .apic{width:210px;height:210px;border-radius:44px;background:#fff;display:grid;place-items:center;
+  font-size:118px;overflow:hidden;box-shadow:0 18px 44px -16px rgba(34,32,28,.5);animation:nudge 2.4s ease-in-out infinite}
+.alarm .apic img{width:100%;height:100%;object-fit:cover}
+@keyframes nudge{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.alarm h2{font-size:23px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.55;margin-top:34px}
+.alarm .aname{font-family:var(--display);font-weight:800;font-size:62px;line-height:1.03;margin:10px 0 6px}
+.alarm .asub{font-size:19px;font-weight:700;opacity:.6}
+.alarm .abtns{display:flex;flex-direction:column;gap:14px;width:100%;max-width:440px;margin-top:42px}
+.adid{background:#12793C;color:#fff;border-radius:26px;padding:28px;font-family:var(--display);font-weight:800;
+  font-size:34px;display:flex;align-items:center;justify-content:center;gap:16px;box-shadow:0 6px 0 rgba(0,0,0,.2)}
+.adid:active{transform:translateY(5px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+.alater{background:transparent;border:3px solid rgba(34,32,28,.25);border-radius:22px;padding:20px;font-weight:800;font-size:22px}
+.ahelp{background:#C4341F;color:#fff;border-radius:22px;padding:22px;font-weight:800;font-size:24px}
+.alarm .acount{margin-top:20px;font-size:15px;font-weight:700;opacity:.5}
+
+/* ---- timer. The draining ring is the real display; the numbers
+       are there for whoever else is in the room. ---- */
+.timer{position:fixed;inset:0;z-index:110;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:26px;text-align:center;background:linear-gradient(170deg,#EAF6FF,#9CCBE8);color:#22201C}
+.tring{position:relative;width:300px;height:300px;max-width:72vw;max-height:72vw}
+.tring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.tring .tbg{fill:none;stroke:rgba(34,32,28,.13);stroke-width:20}
+.tring .tfg{fill:none;stroke:#12793C;stroke-width:20;stroke-linecap:round;transition:stroke-dashoffset 1s linear}
+.tring .inner{position:absolute;inset:0;display:grid;place-items:center;gap:2px}
+.tring .tico{font-size:62px;line-height:1}
+.tring .tnum{font-family:var(--display);font-weight:800;font-size:52px;line-height:1}
+.timer .tlabel{font-family:var(--display);font-weight:800;font-size:40px;margin-top:28px}
+.timer .thint{font-size:18px;font-weight:700;opacity:.6;margin-top:8px}
+.timer .tbtns{display:flex;flex-direction:column;gap:12px;width:100%;max-width:400px;margin-top:34px}
+.tstop{background:transparent;border:3px solid rgba(34,32,28,.25);border-radius:20px;padding:18px;font-weight:800;font-size:20px}
+.tdone{background:#12793C;color:#fff;border-radius:22px;padding:22px;font-weight:800;font-size:24px;box-shadow:0 5px 0 rgba(0,0,0,.2)}
+.tstart{background:#2B4FD0;color:#fff}
+
+/* ---- weather strip + outfit picker ---- */
+.wx{display:flex;align-items:center;gap:16px;background:var(--surface);border-radius:24px;
+  box-shadow:var(--shadow);padding:14px 18px;margin-bottom:6px}
+.wx .wico{font-size:46px;line-height:1}
+.wx .wtemp{font-family:var(--display);font-weight:800;font-size:34px;line-height:1}
+.wx .wtxt{flex:1;font-size:16px;font-weight:700;color:var(--ink-soft)}
+.wx .wheads{font-weight:800;color:var(--alert)}
+
+.outfit{position:fixed;inset:0;z-index:105;overflow-y:auto;padding:26px 20px 130px;
+  background:linear-gradient(170deg,var(--sky-1),var(--sky-2))}
+.outfit .ohead{display:flex;align-items:center;gap:18px;max-width:900px;margin:0 auto 8px}
+.outfit .ohead .wico{font-size:76px}
+.outfit .ohead .wtemp{font-family:var(--display);font-weight:800;font-size:56px;line-height:1}
+.outfit .ohead .sub{font-size:19px;font-weight:700;opacity:.65}
+.outfit .obanner{max-width:900px;margin:14px auto 0;background:var(--alert);color:#fff;border-radius:20px;
+  padding:16px 20px;font-weight:800;font-size:20px;display:flex;gap:12px;align-items:center}
+.olayer{max-width:900px;margin:26px auto 0}
+.olayer h3{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:12px}
+.orow{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:14px}
+.oitem{background:var(--surface);border-radius:24px;box-shadow:var(--shadow);padding:14px;
+  display:grid;place-items:center;gap:10px;border:4px solid transparent}
+.oitem[aria-pressed="true"]{border-color:var(--done)}
+.oitem .pic{width:112px;height:112px;border-radius:20px}
+.oitem b{font-family:var(--display);font-size:19px;text-align:center}
+.oitem .chk{font-size:22px;color:var(--done);height:24px}
+.obar{position:fixed;left:0;right:0;bottom:0;padding:16px 20px calc(16px + env(safe-area-inset-bottom));
+  background:linear-gradient(to top,var(--sky-2) 60%,transparent);display:flex;gap:12px;
+  max-width:900px;margin:0 auto}
+.obar .odone{flex:1;background:#12793C;color:#fff;border-radius:24px;padding:22px;
+  font-family:var(--display);font-weight:800;font-size:28px;box-shadow:0 5px 0 rgba(0,0,0,.2)}
+.obar .oback{background:transparent;border:3px solid var(--line);border-radius:22px;padding:22px 26px;font-weight:800;font-size:18px}
+
+/* ---- check-in and calls ---- */
+.ask{position:fixed;inset:0;z-index:115;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:28px;text-align:center;background:linear-gradient(170deg,#E8F1FF,#9CB8E8);color:#22201C}
+.ask .apic{width:190px;height:190px;border-radius:50%;background:#fff;display:grid;place-items:center;
+  font-size:104px;overflow:hidden;box-shadow:0 18px 44px -16px rgba(34,32,28,.5)}
+.ask .apic img{width:100%;height:100%;object-fit:cover}
+.ask .aname{font-family:var(--display);font-weight:800;font-size:48px;margin:26px 0 4px;line-height:1.05}
+.ask .asub{font-size:21px;font-weight:700;opacity:.6}
+.ask .abtns{display:flex;flex-direction:column;gap:13px;width:100%;max-width:440px;margin-top:36px}
+.ask .aphoto{background:#12793C;color:#fff;border-radius:24px;padding:24px;font-family:var(--display);
+  font-weight:800;font-size:28px;box-shadow:0 5px 0 rgba(0,0,0,.2)}
+.ask .acall{background:#2B4FD0;color:#fff;border-radius:24px;padding:24px;font-family:var(--display);font-weight:800;font-size:28px}
+.ask .ano{background:transparent;border:3px solid rgba(34,32,28,.25);border-radius:20px;padding:18px;font-weight:800;font-size:20px}
+
+.callui{position:fixed;inset:0;z-index:120;background:#0E1016;display:flex;flex-direction:column}
+.callui video{width:100%;height:100%;object-fit:cover;background:#0E1016}
+.callui .far{flex:1;min-height:0}
+.callui .near{position:absolute;right:16px;top:16px;width:140px;height:190px;border-radius:18px;
+  overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.25)}
+.callui .near video{object-fit:cover}
+.callui .state{position:absolute;left:0;right:0;top:44%;text-align:center;color:#fff;
+  font-family:var(--display);font-weight:800;font-size:30px}
+.callui .cbar{position:absolute;left:0;right:0;bottom:0;padding:22px calc(22px + env(safe-area-inset-bottom));
+  display:flex;gap:14px;justify-content:center}
+.callui .hang{background:#C4341F;color:#fff;border-radius:50px;padding:22px 46px;font-family:var(--display);
+  font-weight:800;font-size:26px}
+.callui .flip{background:rgba(255,255,255,.16);color:#fff;border-radius:50px;padding:22px 28px;font-weight:800;font-size:20px}
+
+/* ---- today's plan, warnings, step-by-step ---- */
+.plan{display:flex;gap:12px;overflow-x:auto;padding:2px 2px 6px;margin-bottom:6px;-webkit-overflow-scrolling:touch}
+.ev{flex:none;min-width:150px;background:var(--surface);border-radius:22px;box-shadow:var(--shadow);
+  padding:14px 16px;display:flex;gap:12px;align-items:center;text-align:left}
+.ev .eico{font-size:38px;line-height:1}
+.ev b{font-family:var(--display);font-size:20px;display:block}
+.ev span{font-size:14px;font-weight:700;color:var(--ink-soft)}
+.ev.big{background:var(--ink);color:var(--sky-1)}
+.ev.big span{color:var(--sky-1);opacity:.75}
+
+.warnbar{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top));
+  z-index:95;background:var(--surface);box-shadow:var(--shadow);border-radius:22px;padding:16px 22px;
+  display:flex;gap:14px;align-items:center;max-width:92vw;animation:rise .4s ease}
+.warnbar .wi{font-size:34px}
+.warnbar b{font-family:var(--display);font-size:21px;display:block}
+.warnbar span{font-size:15px;font-weight:700;color:var(--ink-soft)}
+.warnbar button{margin-left:8px;border:2px solid var(--line);border-radius:14px;padding:12px 16px;font-weight:800}
+
+.steps{position:fixed;inset:0;z-index:112;display:flex;flex-direction:column;align-items:center;
+  padding:24px 20px calc(24px + env(safe-area-inset-bottom));background:linear-gradient(170deg,var(--sky-1),var(--sky-2))}
+.steps .dots{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-bottom:18px}
+.steps .dot{width:13px;height:13px;border-radius:50%;background:rgba(34,32,28,.2)}
+.steps .dot.on{background:var(--ink);transform:scale(1.25)}
+.steps .dot.past{background:var(--done)}
+.steps .spic{width:min(56vh,340px);height:min(56vh,340px);border-radius:40px;background:var(--surface);
+  display:grid;place-items:center;font-size:150px;overflow:hidden;box-shadow:0 20px 50px -18px rgba(34,32,28,.5)}
+.steps .spic img{width:100%;height:100%;object-fit:cover}
+.steps .slabel{font-family:var(--display);font-weight:800;font-size:46px;line-height:1.05;text-align:center;margin:26px 0 6px}
+.steps .scount{font-size:17px;font-weight:700;opacity:.55}
+.steps .sbtns{margin-top:auto;display:flex;gap:12px;width:100%;max-width:560px;padding-top:24px}
+.snext{flex:1;background:#12793C;color:#fff;border-radius:26px;padding:26px;font-family:var(--display);
+  font-weight:800;font-size:32px;box-shadow:0 5px 0 rgba(0,0,0,.2)}
+.snext:active{transform:translateY(4px);box-shadow:0 1px 0 rgba(0,0,0,.2)}
+.sback{background:transparent;border:3px solid rgba(34,32,28,.22);border-radius:22px;padding:26px 24px;font-weight:800;font-size:20px}
+.sstop{background:transparent;border:3px solid rgba(34,32,28,.22);border-radius:22px;padding:26px 22px;font-weight:800;font-size:20px}
+
+.gear{position:fixed;right:10px;top:calc(6px + env(safe-area-inset-top));width:58px;height:58px;
+  border-radius:50%;opacity:.3;z-index:50;display:grid;place-items:center;font-size:22px;
+  user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+.gear:after{content:"";position:absolute;inset:0;border-radius:50%;border:3px solid var(--ink);
+  transform:scale(.4);opacity:0}
+.gear.holding{opacity:1}
+.gear.holding:after{transform:scale(1);opacity:.9;transition:transform .9s linear,opacity .15s}
+.offline{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top));background:var(--ink);color:var(--sky-1);padding:8px 16px;border-radius:20px;font-size:13px;font-weight:800;z-index:60}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body data-part="morning">
+
+<button class="gear" id="gear" aria-label="Setup">⚙︎</button>
+<div class="offline hide" id="offline">Saved on this tablet</div>
+
+<main class="wrap" id="view-home">
+  <div class="arc"><svg viewBox="0 0 320 110" preserveAspectRatio="none" id="arcSvg"></svg></div>
+  <div class="head">
+    <h1 class="hello" id="hello">Good morning<small id="dayline">Monday</small></h1>
+    <div class="clock" id="clock">7:00<span id="partword">Morning</span></div>
+  </div>
+  <div id="taskList"></div>
+</main>
+
+<main class="wrap hide" id="view-msg">
+  <div class="head" style="padding-top:26px">
+    <h1 class="hello" id="msgTitle">Messages<small id="msgSub">Pick a person</small></h1>
+  </div>
+  <div id="msgBody"></div>
+</main>
+
+<nav class="bar">
+  <div class="bar-in">
+    <button class="tab" data-go="home" aria-current="true"><em>✓</em>My day</button>
+    <button class="tab" data-go="msg"><em>💬</em>Messages<span class="badge hide" id="msgBadge">0</span></button>
+  </div>
+</nav>
+
+<div class="steps hide" id="steps"></div>
+<div class="warnbar hide" id="warnbar"></div>
+<div class="ask hide" id="ask"></div>
+<div class="callui hide" id="callui"></div>
+<div class="outfit hide" id="outfit"></div>
+<div class="timer hide" id="timer"></div>
+
+<div class="alarm hide" id="alarm"></div>
+
+<div class="cheer hide" id="cheer">
+  <div><div class="big" id="cheerIcon">🎉</div><h2 id="cheerTitle">All done!</h2><p id="cheerText"></p></div>
+</div>
+
+<div class="sheet hide" id="setup">
+  <div class="sheet-head"><h1 style="font-size:30px">Tablet setup</h1><button class="btn ghost" style="width:auto" id="setupClose">Done</button></div>
+  <div class="panel">
+    <h3>Connection</h3>
+    <label class="f">Household code</label>
+    <input type="text" id="fHouse" placeholder="karelynn-home" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label class="f">Worker address</label>
+    <input type="text" id="fApi" placeholder="https://independentme.workers.dev" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <button class="btn" style="margin-top:18px" id="fSave">Save and connect</button>
+    <p class="note" style="margin-top:12px" id="connState"></p>
+    <p class="note" style="margin-top:8px">Tasks and people are set up from the caregiver app, not here. This tablet only needs to know where to look.</p>
+  </div>
+  <div class="panel">
+    <h3>Sound</h3>
+    <div class="row">
+      <button class="chip" id="tSpeak">🔊 Read aloud</button>
+      <button class="chip" id="tSound">🔔 Chime</button>
+    </div>
+    <button class="btn ghost" style="margin-top:16px" id="askNotif">Turn on notifications</button>
+    <p class="note" style="margin-top:12px">Reminders sound while IndependentME is on screen. Leave the app open and the tablet plugged in. For anything that truly cannot be missed, set a backup alarm in the tablet's Clock app too.</p>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Local cache first. The tablet always works offline; the worker
+   is what it syncs to, not what it depends on to function.
+   ============================================================ */
+const LS = {
+  get(k,d){ try{ const v=localStorage.getItem('ime.'+k); return v?JSON.parse(v):d; }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem('ime.'+k, JSON.stringify(v)); }catch(e){} }
+};
+
+let API   = LS.get('api','');
+let HOUSE = LS.get('house','');
+let CFG   = LS.get('config',null);
+let DONE  = LS.get('done',{});
+let MSGS  = LS.get('msgs',[]);
+let QUEUE = LS.get('queue',[]);
+let SPEAK = LS.get('speak',true);
+let SOUND = LS.get('sound',true);
+let lastSeen = LS.get('lastSeen',0);
+let ACKED = LS.get('acked',{});
+let RECENT = LS.get('recent',[]);
+let online = false;
+
+const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayKey = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const mins = t => { const [h,m]=t.split(':').map(Number); return h*60+m; };
+const pretty = t => { let [h,m]=t.split(':').map(Number); const ap=h<12?'am':'pm'; h=h%12||12; return h+':'+String(m).padStart(2,'0')+ap; };
+const partOf = m => m<720?'morning':m<1020?'afternoon':'evening';
+const tasks = () => (CFG&&CFG.tasks)||[];
+const isDone = t => (DONE[todayKey()]||[]).includes(t.id);
+const dayKeyOf = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+
+/* A weekly task that got missed shouldn't quietly vanish for six days. If it's
+   set to carry forward, it stays on the list until it's actually done. */
+function carriedOver(t){
+  if(t.freq!=='weekly' || !t.rollover) return false;
+  const days=t.days||[]; if(!days.length) return false;
+  for(let back=1; back<=7; back++){
+    const d=new Date(); d.setDate(d.getDate()-back);
+    if(!days.includes(d.getDay())) continue;
+    const since=dayKeyOf(d);
+    const done=RECENT.some(r=>r.task_id===t.id && r.day>=since);
+    return !done;                       // only the most recent occurrence counts
+  }
+  return false;
+}
+const dueToday = t => t.freq==='daily' || (t.days||[]).includes(new Date().getDay()) || carriedOver(t);
+
+/* ---------- voice and chime ---------- */
+function speak(text){
+  if(!SPEAK||!('speechSynthesis' in window)) return;
+  try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.rate=(CFG&&CFG.speechRate)||0.8; speechSynthesis.speak(u); }catch(e){}
+}
+let AC;
+function chime(pattern){
+  if(!SOUND) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended') AC.resume();
+    (pattern||[523,659,784]).forEach((f,i)=>{
+      const t=i*.18, o=AC.createOscillator(), g=AC.createGain();
+      o.type='sine'; o.frequency.value=f;
+      g.gain.setValueAtTime(0,AC.currentTime+t);
+      g.gain.linearRampToValueAtTime(.28,AC.currentTime+t+.03);
+      g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+t+.5);
+      o.connect(g); g.connect(AC.destination);
+      o.start(AC.currentTime+t); o.stop(AC.currentTime+t+.55);
+    });
+  }catch(e){}
+}
+
+/* ---------- sync ---------- */
+async function post(path,payload){
+  if(!API||!HOUSE) throw new Error('not configured');
+  const r = await fetch(API.replace(/\/$/,'')+path,{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(Object.assign({house:HOUSE},payload))
+  });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  return r.json();
+}
+async function flushQueue(){
+  while(QUEUE.length){
+    try{ await post(QUEUE[0].path,QUEUE[0].body); QUEUE.shift(); LS.set('queue',QUEUE); }
+    catch(e){ return false; }
+  }
+  return true;
+}
+async function sync(){
+  if(!API||!HOUSE){ setOnline(false); return; }
+  try{
+    await flushQueue();
+    const r = await fetch(API.replace(/\/$/,'')+'/pull?house='+encodeURIComponent(HOUSE)+'&day='+todayKey());
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    const data = await r.json();
+    if(data.config){ const had=CFG&&CFG.lat; CFG=data.config; LS.set('config',CFG); if(!had && CFG.lat!=null) loadWeather(); }
+    DONE[todayKey()] = (data.done||[]).map(d=>d.id);
+    LS.set('done',DONE);
+    RECENT = data.recent||[]; LS.set('recent',RECENT);
+
+    const known = new Set(MSGS.map(m=>m.id));
+    MSGS = data.messages||[];
+    LS.set('msgs',MSGS);
+    const fresh = MSGS.filter(m=>m.dir==='in' && m.id>lastSeen && !known.has(m.id));
+    if(fresh.length) announce(fresh[fresh.length-1]);
+
+    // someone asking to see her, or ringing
+    const pending=MSGS.filter(m=>(m.dir==='ask'||m.dir==='call') && !HANDLED[m.id] && Date.now()-m.at < 180000);
+    if(pending.length && !askMsg && !callRoom){
+      const m=pending[pending.length-1];
+      if(m.dir==='call'){
+        HANDLED[m.id]=true; LS.set('handled',HANDLED);
+        const [room,from]=String(m.body).split('|');
+        askMsg={id:m.id,who:from||m.who,room};
+        showIncomingCall(askMsg);
+      } else showAsk(m);
+    }
+
+    // "Nan is coming" — she asked for help and someone picked it up
+    MSGS.filter(m=>m.dir==='alert' && m.ack && !ACKED[m.id]).forEach(m=>{
+      ACKED[m.id]=true; LS.set('acked',ACKED);
+      chime([784,988]);
+      speak(m.ack+' is coming to help you.');
+      onTheWay(m.ack);
+    });
+    setOnline(true);
+  }catch(e){ setOnline(false); }
+  renderHome(); renderMsg(); updateBadge();
+}
+function setOnline(v){ online=v; document.getElementById('offline').classList.toggle('hide',v); }
+
+function announce(m){
+  chime([659,784,988]);
+  speak('Message from '+(m.who||'someone')+'. '+m.body);
+  if('Notification' in window && Notification.permission==='granted'){
+    try{ new Notification('Message from '+(m.who||'someone'),{body:m.body,tag:'m'+m.id}); }catch(e){}
+  }
+}
+function onTheWay(name){
+  const el=document.getElementById('cheer');
+  document.getElementById('cheerIcon').textContent='🚶';
+  document.getElementById('cheerTitle').textContent=name+' is coming';
+  document.getElementById('cheerText').textContent='Hang tight.';
+  el.classList.remove('hide'); setTimeout(()=>el.classList.add('hide'),3000);
+}
+
+function updateBadge(){
+  const n = MSGS.filter(m=>m.dir==='in'&&m.id>lastSeen).length;
+  const b = document.getElementById('msgBadge');
+  b.textContent=n; b.classList.toggle('hide',n===0);
+}
+
+/* ---------- home ---------- */
+function drawArc(){
+  const now=new Date(), nowM=now.getHours()*60+now.getMinutes();
+  const START=360,END=1350;
+  const x = m => 10+(Math.min(Math.max(m,START),END)-START)/(END-START)*300;
+  const y = m => 88-Math.sin((x(m)-10)/300*Math.PI)*66;
+  const dots = tasks().filter(dueToday).map(t=>
+    `<circle class="arc-dot ${isDone(t)?'done':''}" cx="${x(effTime(t)).toFixed(1)}" cy="${y(effTime(t)).toFixed(1)}" r="4.5"/>`).join('');
+  let path='M'; for(let m=START;m<=END;m+=20) path+=`${x(m).toFixed(1)},${y(m).toFixed(1)} `;
+  document.getElementById('arcSvg').innerHTML =
+    `<path class="arc-path" d="${path}"/>${dots}<circle class="arc-sun" cx="${x(nowM).toFixed(1)}" cy="${y(nowM).toFixed(1)}" r="12"/>`;
+}
+
+function renderHome(){
+  const now=new Date(), nowM=now.getHours()*60+now.getMinutes(), part=partOf(nowM);
+  document.body.dataset.part=part;
+  const nm = (CFG&&CFG.name)?', '+CFG.name:'';
+  document.getElementById('hello').firstChild.nodeValue =
+    (part==='morning'?'Good morning':part==='afternoon'?'Good afternoon':'Good evening')+nm;
+  document.getElementById('dayline').textContent = DAYS[now.getDay()];
+  let h=now.getHours()%12||12;
+  document.getElementById('clock').firstChild.nodeValue = h+':'+String(now.getMinutes()).padStart(2,'0');
+  document.getElementById('partword').textContent = part;
+
+  const box=document.getElementById('taskList');
+  if(!CFG){
+    box.innerHTML = `<div class="empty"><em>🔌</em>Not set up yet.<br>Hold the grey circle in the top right corner for two seconds.</div>`;
+    drawArc(); return;
+  }
+  const list = tasks().filter(dueToday).sort((a,b)=>effTime(a)-effTime(b));
+  const open = list.filter(t=>!isDone(t)), fin = list.filter(isDone);
+  if(!list.length){ box.innerHTML=`<div class="empty"><em>🌤️</em>Nothing on the list today.</div>`; drawArc(); return; }
+
+  let html='';
+  if(!open.length){
+    html += `<div class="card" style="display:block;text-align:center;padding:40px 20px">
+      <div style="font-size:74px">🏆</div><div class="cname" style="margin-top:10px">Everything is done!</div>
+      <div class="cwhen">Great job today.</div></div>`;
+  }
+  let last='', chunk=[];
+  open.forEach((t,i)=>{
+    const g=partOf(effTime(t));
+    if(g!==last){
+      if(chunk.length){ html+=`<div class="cards">${chunk.join('')}</div>`; chunk=[]; }
+      html+=`<div class="group-label">${g==='morning'?'☀️ Morning':g==='afternoon'?'🌤️ Afternoon':'🌙 Evening'}</div>`;
+      last=g;
+    }
+    chunk.push(cardHTML(t, effTime(t)<=nowM, i));
+  });
+  if(chunk.length) html+=`<div class="cards">${chunk.join('')}</div>`;
+  if(fin.length) html+=`<div class="group-label">✓ Finished</div><div class="cards">`+fin.map((t,i)=>cardHTML(t,false,i,true)).join('')+`</div>`;
+  const aw=awayWindow(), anm=nowMins();
+  const back = aw && anm>=aw.to && anm<aw.to+60
+    ? `<div class="card" style="display:block;text-align:center;padding:26px 18px">
+         <div style="font-size:56px">🏡</div>
+         <div class="cname" style="margin-top:8px">Welcome home</div>
+         <div class="cwhen">Here is what is left for today.</div></div>` : '';
+  box.innerHTML=wxStrip()+planStrip()+back+html;
+  drawArc();
+}
+
+function cardHTML(t,due,i,finished){
+  const timed = t.timer > 0 && !finished;
+  const dress = t.outfit && !finished;
+  const stepped = (t.steps||[]).length > 0 && !finished;
+  return `<div class="card ${finished?'is-done':''} ${due&&!finished?'is-due':''}" style="animation-delay:${i*45}ms">
+    <div class="pic">${t.photo?`<img src="${t.photo}" alt="">`:t.icon}</div>
+    <div class="cbody">
+      <div class="cname">${esc(t.name)}</div>
+      <div class="cwhen">${carriedOver(t)?'Still to do · ':t.freq==='weekly'?'This week · ':''}${effTime(t)!==mins(t.time)?'when you get home':pretty(t.time)}${t.timer?' · '+Math.round(t.timer/60)+' min':''}</div>
+      <div class="crow">
+        <button class="mini" data-speak="${esc(t.name)}" aria-label="Read out loud">🔊</button>
+        ${(timed||dress||stepped)?`<button class="mini" data-toggle="${t.id}" aria-label="Already did this">✓</button>`:''}
+      </div>
+    </div>
+    ${stepped
+      ? `<button class="tick" style="background:#2B4FD0" data-steps="${t.id}" aria-label="Show me how">
+           <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h9"/></svg></button>`
+      : dress
+      ? `<button class="tick" style="background:#2B4FD0" data-dress="${t.id}" aria-label="Pick clothes">
+           <svg viewBox="0 0 24 24"><path d="M8 3l4 3 4-3 4 4-3 3v11H7V10L4 7z"/></svg></button>`
+      : timed
+      ? `<button class="tick tstart" data-start="${t.id}" aria-label="Start the timer">
+           <svg viewBox="0 0 24 24"><path d="M7 4.5l12 7.5-12 7.5z" fill="#fff" stroke="none"/></svg></button>`
+      : `<button class="tick" data-toggle="${t.id}" aria-label="${finished?'Undo':'Mark done'}">
+           <svg viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6"/></svg></button>`}
+    </div>`;
+}
+
+function toggle(id){
+  const day=todayKey();
+  DONE[day]=DONE[day]||[];
+  const t=tasks().find(x=>x.id===id); if(!t) return;
+  const at=DONE[day].indexOf(id), nowDone = at===-1;
+  if(nowDone) DONE[day].push(id); else DONE[day].splice(at,1);
+  LS.set('done',DONE);
+  QUEUE.push({path:'/done',body:{taskId:id,day,done:nowDone}});
+  LS.set('queue',QUEUE);
+  flushQueue();
+  if(nowDone){
+    chime();
+    cheer(tasks().filter(dueToday).filter(x=>!isDone(x)).length, t.name);
+  }
+  renderHome();
+}
+
+function cheer(left,name){
+  const el=document.getElementById('cheer'), all=left===0;
+  document.getElementById('cheerIcon').textContent = all?'🏆':['⭐','👏','💪','🎉','✨'][Math.floor(Math.random()*5)];
+  document.getElementById('cheerTitle').textContent = all?'All done!':'Nice work!';
+  document.getElementById('cheerText').textContent = all?'You finished everything today.'
+    : left===1?'Just one more thing to do.':left+' things left to do.';
+  el.classList.remove('hide');
+  speak(all?'All done! You finished everything today.':name+' finished. Nice work.');
+  setTimeout(()=>el.classList.add('hide'),1900);
+}
+
+/* ============================================================
+   Today's plan
+
+   Knowing what the day holds is worth as much as being reminded
+   what to do in it. Day-service days, appointments, anyone coming
+   over. Shown as pictures, spoken on tap.
+   ============================================================ */
+/* ============================================================
+   Days she's out
+
+   The tablet stays home on day-service days. Nothing should fire
+   into an empty room, and she shouldn't walk back in at three to a
+   screen full of red. Anything scheduled while she's out simply
+   waits for her, without being marked late.
+   ============================================================ */
+function awayWindow(){
+  const e=eventsToday().find(x=>x.away && x.from && x.to);
+  return e ? {from:mins(e.from), to:mins(e.to), title:e.title} : null;
+}
+const nowMins = () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); };
+function awayNow(){ const w=awayWindow(); return !!w && nowMins()>=w.from && nowMins()<w.to; }
+
+/* Where a task actually lands today. Something set for noon on a day
+   she's out belongs just after she gets home, not at noon. */
+function effTime(t){
+  const w=awayWindow(); const m=mins(t.time);
+  if(w && m>=w.from && m<w.to) return w.to+5;
+  return m;
+}
+
+function eventsToday(){
+  const now=new Date(), dow=now.getDay(), key=todayKey();
+  return ((CFG&&CFG.events)||[]).filter(e=>
+    e.kind==='date' ? e.date===key : (e.days||[]).includes(dow)
+  ).sort((a,b)=>(a.from||'99:99').localeCompare(b.from||'99:99'));
+}
+
+function planStrip(){
+  const evs=eventsToday();
+  if(!evs.length) return '';
+  return `<div class="plan">`+evs.map(e=>
+    `<button class="ev ${e.big?'big':''}" data-ev="${e.id}">
+       <div class="eico">${e.photo?`<img src="${e.photo}" style="width:38px;height:38px;border-radius:9px;object-fit:cover">`:e.icon}</div>
+       <div><b>${esc(e.title)}</b><span>${e.from?pretty(e.from):'today'}${e.to?' to '+pretty(e.to):''}</span></div>
+     </button>`).join('')+`</div>`;
+}
+
+function tellEvent(id){
+  const e=eventsToday().find(x=>x.id===id); if(!e) return;
+  const items=(e.items||[]).map(i=>i.label).join(', ');
+  speak(e.title+(e.from?' at '+pretty(e.from):'')+'. '+(items?'You will be doing '+items+'.':'')+(e.note||''));
+  if((e.items||[]).length){
+    const el=document.getElementById('cheer');
+    document.getElementById('cheerIcon').textContent=e.icon||'📅';
+    document.getElementById('cheerTitle').textContent=e.title;
+    document.getElementById('cheerText').textContent=(e.items||[]).map(i=>i.icon+' '+i.label).join('   ');
+    el.classList.remove('hide'); setTimeout(()=>el.classList.add('hide'),5000);
+  }
+}
+
+/* ============================================================
+   Transition warnings
+
+   A quiet heads-up before something starts, so she has time to
+   finish what she's doing and come to it herself. No countdown,
+   no urgency, no sound that means hurry.
+   ============================================================ */
+const WARNED=new Set();
+function checkWarnings(){
+  if(awayNow()) return;
+  if(alarmTask||timerTask||outfitTask||stepTask||askMsg||callRoom) return;
+  const now=new Date(), nowM=now.getHours()*60+now.getMinutes();
+
+  tasks().filter(dueToday).filter(t=>!isDone(t)).forEach(t=>{
+    const lead=t.warn!=null?t.warn:5;
+    if(!lead) return;
+    const k='t'+todayKey()+t.id;
+    if(WARNED.has(k)) return;
+    const d=effTime(t)-nowM;
+    if(d<=lead && d>0){ WARNED.add(k); warn(t.icon,'In '+d+' minute'+(d>1?'s':''), t.name); }
+  });
+
+  eventsToday().forEach(e=>{
+    if(!e.from) return;
+    const lead=e.warn!=null?e.warn:15;
+    const k='e'+todayKey()+e.id;
+    if(WARNED.has(k)) return;
+    const d=mins(e.from)-nowM;
+    if(d<=lead && d>0){ WARNED.add(k); warn(e.icon,'In '+d+' minute'+(d>1?'s':''), e.title); }
+  });
+}
+
+function warn(icon,when,what){
+  const el=document.getElementById('warnbar');
+  el.innerHTML=`<div class="wi">${icon||'🕐'}</div>
+    <div><b>${esc(what)}</b><span>${esc(when)}</span></div>
+    <button id="warnOk">Okay</button>`;
+  el.classList.remove('hide');
+  chime([523]);                                   // one soft note, not an alarm
+  speak('In '+when.replace('In ','')+', '+what.toLowerCase()+'.');
+  clearTimeout(warn._t); warn._t=setTimeout(()=>el.classList.add('hide'),25000);
+}
+
+/* ============================================================
+   Step by step
+
+   One picture at a time. Her place is saved, so an interruption
+   doesn't mean starting over. For anything involving water the
+   tablet walks her through it first, then stays behind.
+   ============================================================ */
+let stepTask=null, stepIx=0;
+const stepKey = t => 'step:'+todayKey()+':'+t.id;
+
+function openSteps(t, from){
+  stepTask=t;
+  stepIx = from!=null ? from : (LS.get(stepKey(t),0)||0);
+  if(stepIx >= (t.steps||[]).length) stepIx=0;
+  drawStep();
+  document.getElementById('steps').classList.remove('hide');
+}
+
+function drawStep(){
+  const t=stepTask, list=t.steps||[], st=list[stepIx];
+  if(!st) return finishSteps();
+  document.getElementById('steps').innerHTML=`
+    <div class="dots">${list.map((_,i)=>`<div class="dot ${i===stepIx?'on':i<stepIx?'past':''}"></div>`).join('')}</div>
+    <div class="spic">${st.photo?`<img src="${st.photo}" alt="">`:st.icon}</div>
+    <div class="slabel">${esc(st.label)}</div>
+    <div class="scount">${stepIx+1} of ${list.length}</div>
+    <div class="sbtns">
+      ${stepIx>0?`<button class="sback" id="sBack">←</button>`:''}
+      <button class="snext" id="sNext">${stepIx===list.length-1?(t.preview?'Ready':'✓ Done'):'Next →'}</button>
+      <button class="sstop" id="sStop">Stop</button>
+    </div>`;
+  speak(st.label);
+  LS.set(stepKey(t),stepIx);
+}
+
+function nextStep(){
+  const list=stepTask.steps||[];
+  if(stepIx < list.length-1){ stepIx++; chime([659]); drawStep(); }
+  else finishSteps();
+}
+function prevStep(){ if(stepIx>0){ stepIx--; drawStep(); } }
+
+function finishSteps(){
+  const t=stepTask;
+  LS.set(stepKey(t),0);
+  if(t.preview){
+    // Water and tablets don't mix. She's seen the steps; now it stays put.
+    document.getElementById('steps').innerHTML=`
+      <div class="spic" style="margin-top:8vh">${t.photo?`<img src="${t.photo}" alt="">`:t.icon}</div>
+      <div class="slabel">Leave the tablet here</div>
+      <div class="scount" style="font-size:21px;max-width:520px;text-align:center;margin-top:10px">
+        Go and ${esc(t.name.toLowerCase())}. Come back and press the green button when you are finished.</div>
+      <div class="sbtns"><button class="snext" id="sDone">✓ I finished</button></div>`;
+    speak('You have seen all the steps. Leave the tablet here and go and '+t.name.toLowerCase()+'. Press the green button when you are finished.');
+    return;
+  }
+  closeSteps(); toggle(t.id);
+}
+
+function closeSteps(){ document.getElementById('steps').classList.add('hide'); stepTask=null; }
+
+/* ============================================================
+   Checking in
+
+   Someone asks; she answers. Nothing here opens the camera without
+   her tapping it, and "Not right now" is a real answer that gets
+   sent back rather than being silently ignored.
+   ============================================================ */
+let askMsg=null, HANDLED=LS.get('handled',{});
+
+function showAsk(m){
+  askMsg=m;
+  const person=((CFG&&CFG.contacts)||[]).find(c=>c.name===m.who);
+  document.getElementById('ask').innerHTML=`
+    <div class="apic">${person&&person.photo?`<img src="${person.photo}" alt="">`:(person?person.icon:'👋')}</div>
+    <div class="aname">${esc(m.who||'Someone')}</div>
+    <div class="asub">would like to see you</div>
+    <div class="abtns">
+      <button class="aphoto" id="askPhoto">📷 &nbsp;Send a picture</button>
+      <button class="acall" id="askCall">📹 &nbsp;Video call</button>
+      <button class="ano" id="askNo">Not right now</button>
+    </div>`;
+  document.getElementById('ask').classList.remove('hide');
+  chime([659,880]);
+  speak(m.who+' would like to see you.');
+}
+
+function showIncomingCall(m){
+  const person=((CFG&&CFG.contacts)||[]).find(c=>c.name===m.who);
+  document.getElementById('ask').innerHTML=`
+    <div class="apic">${person&&person.photo?`<img src="${person.photo}" alt="">`:(person?person.icon:'📹')}</div>
+    <div class="aname">${esc(m.who||'Someone')}</div>
+    <div class="asub">is calling you</div>
+    <div class="abtns">
+      <button class="acall" id="askAnswer">📹 &nbsp;Answer</button>
+      <button class="ano" id="askNo">Not right now</button>
+    </div>`;
+  document.getElementById('ask').classList.remove('hide');
+  askMsg=m;
+  chime([880,660,880]); speak(m.who+' is calling you.');
+}
+
+function closeAsk(){ document.getElementById('ask').classList.add('hide'); askMsg=null; }
+
+async function sendPhoto(){
+  const m=askMsg;
+  document.getElementById('ask').innerHTML='<div class="aname">Just a moment…</div>';
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:960}});
+    const v=document.createElement('video');
+    v.srcObject=stream; v.muted=true; v.playsInline=true; await v.play();
+    await new Promise(r=>setTimeout(r,900));             // let exposure settle
+    const cv=document.createElement('canvas');
+    cv.width=640; cv.height=Math.round(640*v.videoHeight/v.videoWidth);
+    cv.getContext('2d').drawImage(v,0,0,cv.width,cv.height);
+    stream.getTracks().forEach(t=>t.stop());
+    const data=cv.toDataURL('image/jpeg',.7);
+    QUEUE.push({path:'/photo',body:{data,who:m?m.who:'',askId:m?m.id:null}});
+    LS.set('queue',QUEUE); await flushQueue();
+    if(m){ HANDLED[m.id]=true; LS.set('handled',HANDLED); }
+    closeAsk();
+    chime([784,988]); speak('Sent.');
+    const el=document.getElementById('cheer');
+    document.getElementById('cheerIcon').textContent='📸';
+    document.getElementById('cheerTitle').textContent='Sent!';
+    document.getElementById('cheerText').textContent=(m?m.who:'They')+' can see you now.';
+    el.classList.remove('hide'); setTimeout(()=>el.classList.add('hide'),2000);
+  }catch(e){
+    speak('I could not open the camera.');
+    if(m) showAsk(m); else closeAsk();
+  }
+}
+
+function declineAsk(){
+  const m=askMsg;
+  if(m){ HANDLED[m.id]=true; LS.set('handled',HANDLED); }
+  QUEUE.push({path:'/decline',body:{askId:m?m.id:null,who:m?m.who:''}});
+  LS.set('queue',QUEUE); flushQueue();
+  closeAsk();
+  speak('Okay. I told them not right now.');
+}
+
+/* ============================================================
+   Video calls
+
+   Signalling goes through the worker by polling, which is slower
+   to connect than a socket but has nothing extra to run or pay for.
+   ============================================================ */
+let pc=null, localStream=null, callRoom=null, callSide='b', sigSince=0, sigPoll=null, facing='user';
+
+const iceConfig = () => ({ iceServers: (CFG&&CFG.turn&&CFG.turn.urls)
+  ? [{urls:'stun:stun.l.google.com:19302'}, CFG.turn]
+  : [{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}] });
+
+async function sig(kind,payload){
+  try{ await post('/signal',{room:callRoom,side:callSide,kind,payload:JSON.stringify(payload||null)}); }catch(e){}
+}
+
+function callUI(state){
+  document.getElementById('callui').innerHTML=`
+    <div class="far"><video id="vFar" autoplay playsinline></video></div>
+    <div class="near"><video id="vNear" autoplay playsinline muted></video></div>
+    ${state?`<div class="state">${esc(state)}</div>`:''}
+    <div class="cbar">
+      <button class="flip" id="cFlip">🔄</button>
+      <button class="hang" id="cHang">End call</button>
+    </div>`;
+  document.getElementById('callui').classList.remove('hide');
+  if(localStream) document.getElementById('vNear').srcObject=localStream;
+}
+
+async function startCall(room, side, toName){
+  callRoom=room; callSide=side; sigSince=0;
+  callUI(side==='a'?'Calling…':'Connecting…');
+  try{
+    localStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:true});
+  }catch(e){ speak('I could not open the camera.'); endCall(); return; }
+  document.getElementById('vNear').srcObject=localStream;
+
+  pc=new RTCPeerConnection(iceConfig());
+  localStream.getTracks().forEach(t=>pc.addTrack(t,localStream));
+  pc.ontrack=e=>{
+    const far=document.getElementById('vFar');
+    if(far && far.srcObject!==e.streams[0]){ far.srcObject=e.streams[0]; callUI(''); document.getElementById('vFar').srcObject=e.streams[0]; document.getElementById('vNear').srcObject=localStream; }
+  };
+  pc.onicecandidate=e=>{ if(e.candidate) sig('ice',e.candidate); };
+  pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) endCall(); };
+
+  if(side==='a'){
+    const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
+    await sig('offer',offer);
+    if(toName) post('/call',{room,from:(CFG&&CFG.name)||'Home',to:toName}).catch(()=>{});
+  }
+  sigPoll=setInterval(pollSignal,1200);
+}
+
+async function pollSignal(){
+  if(!callRoom||!pc) return;
+  try{
+    const r=await fetch(API.replace(/\/$/,'')+'/signal?house='+encodeURIComponent(HOUSE)+'&room='+encodeURIComponent(callRoom)+'&since='+sigSince);
+    const d=await r.json();
+    for(const it of (d.items||[])){
+      sigSince=Math.max(sigSince,it.id);
+      if(it.side===callSide) continue;
+      const p=JSON.parse(it.payload||'null');
+      if(it.kind==='offer'){
+        await pc.setRemoteDescription(p);
+        const ans=await pc.createAnswer(); await pc.setLocalDescription(ans);
+        await sig('answer',ans);
+      } else if(it.kind==='answer' && !pc.currentRemoteDescription){
+        await pc.setRemoteDescription(p);
+      } else if(it.kind==='ice' && p){
+        try{ await pc.addIceCandidate(p); }catch(e){}
+      } else if(it.kind==='end'){ endCall(); }
+    }
+  }catch(e){}
+}
+
+function endCall(){
+  if(callRoom) sig('end',null);
+  clearInterval(sigPoll); sigPoll=null;
+  if(pc){ try{pc.close();}catch(e){} pc=null; }
+  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  callRoom=null;
+  document.getElementById('callui').classList.add('hide');
+  document.getElementById('callui').innerHTML='';
+}
+
+async function flipCamera(){
+  facing = facing==='user' ? 'environment' : 'user';
+  if(!pc||!localStream) return;
+  try{
+    const ns=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:true});
+    const track=ns.getVideoTracks()[0];
+    const sender=pc.getSenders().find(x=>x.track&&x.track.kind==='video');
+    if(sender) await sender.replaceTrack(track);
+    localStream.getVideoTracks().forEach(t=>t.stop());
+    localStream=ns;
+    document.getElementById('vNear').srcObject=ns;
+  }catch(e){}
+}
+
+/* ============================================================
+   Weather
+
+   Open-Meteo, no key needed. The forecast is only surfaced when it
+   would change what she puts on: rain coming, or a big swing later.
+   Otherwise it stays quiet, because a heads-up she gets every single
+   day stops being a heads-up.
+   ============================================================ */
+let WX = LS.get('wx', null);
+
+const WCODE = {
+  0:['☀️','clear'], 1:['🌤️','mostly sunny'], 2:['⛅','partly cloudy'], 3:['☁️','cloudy'],
+  45:['🌫️','foggy'], 48:['🌫️','foggy'],
+  51:['🌦️','drizzle'], 53:['🌦️','drizzle'], 55:['🌦️','drizzle'],
+  61:['🌧️','rain'], 63:['🌧️','rain'], 65:['🌧️','heavy rain'],
+  66:['🌧️','freezing rain'], 67:['🌧️','freezing rain'],
+  71:['🌨️','snow'], 73:['🌨️','snow'], 75:['❄️','heavy snow'], 77:['🌨️','snow'],
+  80:['🌦️','showers'], 81:['🌧️','showers'], 82:['⛈️','heavy showers'],
+  85:['🌨️','snow showers'], 86:['❄️','snow showers'],
+  95:['⛈️','thunderstorms'], 96:['⛈️','thunderstorms'], 99:['⛈️','thunderstorms']
+};
+const wxOf = c => WCODE[c] || ['🌡️',''];
+
+async function loadWeather(){
+  if(!CFG || CFG.lat==null || CFG.lon==null) return;
+  try{
+    const u='https://api.open-meteo.com/v1/forecast?latitude='+CFG.lat+'&longitude='+CFG.lon+
+      '&current=temperature_2m,weather_code&hourly=temperature_2m,precipitation_probability,weather_code'+
+      '&temperature_unit=fahrenheit&timezone=auto&forecast_days=2';
+    const r=await fetch(u); if(!r.ok) throw 0;
+    const d=await r.json();
+    const now=new Date(), hrs=d.hourly.time.map(t=>new Date(t));
+    const start=hrs.findIndex(t=>t>=now);
+    const win=[]; for(let i=Math.max(0,start); i<hrs.length && win.length<12; i++) win.push(i);
+
+    WX={
+      temp: Math.round(d.current.temperature_2m),
+      code: d.current.weather_code,
+      low:  Math.round(Math.min(...win.map(i=>d.hourly.temperature_2m[i]))),
+      high: Math.round(Math.max(...win.map(i=>d.hourly.temperature_2m[i]))),
+      rain: Math.max(...win.map(i=>d.hourly.precipitation_probability[i]||0)),
+      rainSoon: win.slice(0,4).some(i=>(d.hourly.precipitation_probability[i]||0)>=50),
+      at: Date.now()
+    };
+    LS.set('wx',WX);
+  }catch(e){ /* keep the cached one; stale weather beats none */ }
+}
+
+/* Returns a sentence only when it would change her clothes. */
+function wxHeadsUp(){
+  if(!WX) return null;
+  if(WX.rain >= 50) return WX.rainSoon ? 'Rain is coming. Take a coat.' : 'Rain later today. Take a coat.';
+  if(WX.low <= WX.temp - 14) return 'It gets colder later. Bring something warm.';
+  if(WX.high >= WX.temp + 16) return 'It warms up a lot later.';
+  if(WX.temp <= 25) return 'It is very cold out.';
+  return null;
+}
+
+function wxStrip(){
+  if(!WX) return '';
+  const [ico,word]=wxOf(WX.code), heads=wxHeadsUp();
+  return `<div class="wx">
+    <div class="wico">${ico}</div>
+    <div class="wtemp">${WX.temp}°</div>
+    <div class="wtxt">${heads?`<span class="wheads">${esc(heads)}</span>`:esc(word||'outside')}</div>
+    <button class="mini" data-speak="It is ${WX.temp} degrees and ${word||'outside'}. ${heads||''}">🔊</button>
+  </div>`;
+}
+
+/* ============================================================
+   Getting dressed
+
+   She picks. The app only narrows the closet down to what suits
+   the temperature, which is the part that's hard to work out
+   from a number on a screen.
+   ============================================================ */
+const LAYERS=[['outer','Coat'],['top','Shirt'],['bottom','Pants'],['feet','Shoes'],['extra','Also']];
+let outfitTask=null, picked_={};
+
+function suits(item){
+  if(!WX) return true;
+  if(item.rain && WX.rain < 50) return false;
+  const lo = item.minF!=null ? item.minF : -99;
+  const hi = item.maxF!=null ? item.maxF : 199;
+  return WX.temp >= lo && WX.temp <= hi;
+}
+
+function openOutfit(t){
+  outfitTask=t; picked_={};
+  drawOutfit();
+  document.getElementById('outfit').classList.remove('hide');
+  const heads=wxHeadsUp();
+  speak('It is '+(WX?WX.temp+' degrees':'time to get dressed')+'. '+(heads||'')+' Pick your clothes.');
+}
+
+function drawOutfit(){
+  const closet=(CFG&&CFG.wardrobe)||[];
+  const [ico,word]=WX?wxOf(WX.code):['👕',''];
+  const heads=wxHeadsUp();
+  let html=`<div class="ohead">
+      <div class="wico">${ico}</div>
+      <div><div class="wtemp">${WX?WX.temp+'°':'&nbsp;'}</div><div class="sub">${esc(word||'Get dressed')}</div></div>
+    </div>
+    ${heads?`<div class="obanner">⚠️ ${esc(heads)}</div>`:''}`;
+
+  if(!closet.length){
+    html += `<div class="olayer"><div class="empty" style="background:var(--surface);border-radius:24px">
+      <em>👕</em>Nothing set up yet.</div></div>`;
+  }
+  LAYERS.forEach(([key,label])=>{
+    const items = closet.filter(i=>i.layer===key && suits(i)).slice(0,6);
+    if(!items.length) return;
+    html += `<div class="olayer"><h3>${label}</h3><div class="orow">`+
+      items.map(i=>`<button class="oitem" data-wear="${i.id}" aria-pressed="${picked_[key]===i.id}">
+        <div class="pic">${i.photo?`<img src="${i.photo}" alt="">`:i.icon}</div>
+        <b>${esc(i.name)}</b>
+        <div class="chk">${picked_[key]===i.id?'✓':''}</div></button>`).join('')+`</div></div>`;
+  });
+  html += `<div class="obar"><button class="oback" id="oBack">Back</button>
+    <button class="odone" id="oDone">✓ I'm dressed</button></div>`;
+  document.getElementById('outfit').innerHTML=html;
+}
+
+function closeOutfit(){ document.getElementById('outfit').classList.add('hide'); outfitTask=null; }
+
+/* ============================================================
+   Timer
+
+   For tasks that aren't done when you start them, they're done when
+   enough time has passed. Brushing teeth, a shower, letting
+   conditioner sit. The draining ring is the display that matters:
+   she can see how much is left without reading the number.
+   ============================================================ */
+let timerTask=null, timerEnds=0, timerInt=null, timerLock=null, spoken={};
+const RING = 2*Math.PI*130;
+
+async function openTimer(t){
+  timerTask=t; timerEnds=Date.now()+t.timer*1000; spoken={};
+  const el=document.getElementById('timer');
+  el.innerHTML=`
+    <div class="tring">
+      <svg viewBox="0 0 300 300">
+        <circle class="tbg" cx="150" cy="150" r="130"/>
+        <circle class="tfg" cx="150" cy="150" r="130" stroke-dasharray="${RING}" stroke-dashoffset="0" id="tfg"/>
+      </svg>
+      <div class="inner">
+        <div class="tico">${t.photo?'⏳':t.icon}</div>
+        <div class="tnum" id="tnum">${fmt(t.timer)}</div>
+      </div>
+    </div>
+    <div class="tlabel">${esc(t.name)}</div>
+    <div class="thint" id="thint">Keep going until the circle is empty</div>
+    <div class="tbtns">
+      <button class="tdone hide" id="tFinish">✓ &nbsp;All done</button>
+      <button class="tstop" id="tStop">Stop</button>
+    </div>`;
+  el.classList.remove('hide');
+  chime([659,880]);
+  speak('Starting. '+t.name+'. Keep going until the circle is empty.');
+  timerInt=setInterval(tickTimer,250);
+  try{ if('wakeLock' in navigator) timerLock=await navigator.wakeLock.request('screen'); }catch(e){}
+}
+
+const fmt = s => Math.floor(s/60)+':'+String(Math.max(0,Math.round(s%60))).padStart(2,'0');
+
+function tickTimer(){
+  if(!timerTask) return;
+  const left = Math.max(0,(timerEnds-Date.now())/1000);
+  const frac = 1 - left/timerTask.timer;
+  const fg=document.getElementById('tfg'), num=document.getElementById('tnum');
+  if(fg) fg.setAttribute('stroke-dashoffset', RING*frac);
+  if(num) num.textContent = fmt(left);
+
+  if(left <= timerTask.timer/2 && !spoken.half && timerTask.timer>=90){ spoken.half=true; chime([659]); speak('Halfway there.'); }
+  if(left <= 10 && !spoken.ten){ spoken.ten=true; speak('Ten more seconds.'); }
+  if(left <= 0) finishTimer();
+}
+
+function finishTimer(){
+  const t=timerTask;
+  stopTimer();
+  chime([523,659,784,1047]);
+  speak('All done. Great job.');
+  toggle(t.id);
+}
+
+function stopTimer(){
+  clearInterval(timerInt); timerInt=null;
+  document.getElementById('timer').classList.add('hide');
+  try{ if(timerLock){ timerLock.release(); timerLock=null; } }catch(e){}
+  timerTask=null;
+}
+
+function cancelTimer(){
+  const t=timerTask;
+  stopTimer();
+  try{ speechSynthesis.cancel(); }catch(e){}
+  speak('Stopped. You can start it again when you are ready.');
+  // put it back in a few minutes rather than treating it as refused
+  const k=todayKey()+'|'+t.id, s=SNOOZE[k]||{count:0,until:0};
+  s.until=Date.now()+5*60000; SNOOZE[k]=s; LS.set('snooze',SNOOZE);
+  renderHome();
+}
+
+/* ============================================================
+   Alarms
+
+   A notification is built to be swiped away, so it is only a
+   backstop here. The real reminder is a full-screen takeover with
+   no close, no X, and no edge to escape from. It ends one of two
+   ways: she taps "I did it", or it hands her over to a person.
+
+   "Not yet" exists on purpose. Taking it away would be pushing
+   rather than reminding. But it is finite: after the allowed
+   number of postponements the button is replaced by "I need help",
+   which messages you. The accountability moves to a human instead
+   of getting louder at her.
+   ============================================================ */
+let SNOOZE = LS.get('snooze', {});     // { 'day|taskId': {count, until} }
+let alarmTask = null, alarmTimer = null, wakeLock = null;
+
+const snoozeMins = () => (CFG && CFG.snoozeMinutes) || 10;
+const maxSnoozes = () => (CFG && CFG.maxSnoozes  != null) ? CFG.maxSnoozes : 3;
+const sKey = t => todayKey()+'|'+t.id;
+
+function checkReminders(){
+  if(awayNow()) return;                                  // she isn't here
+  if(alarmTask || timerTask || outfitTask || stepTask || askMsg || callRoom) return;   // one thing at a time
+  const nowM = new Date().getHours()*60 + new Date().getMinutes();
+  const due = tasks().filter(dueToday)
+    .filter(t=>!isDone(t))
+    .filter(t=>{
+      const s = SNOOZE[sKey(t)];
+      if(s && s.until > Date.now()) return false;
+      return nowM >= effTime(t);
+    })
+    .sort((a,b)=>mins(a.time)-mins(b.time));
+  if(due.length) openAlarm(due[0]);
+}
+
+async function openAlarm(t){
+  alarmTask = t;
+  const s = SNOOZE[sKey(t)] || {count:0, until:0};
+  const canWait = s.count < maxSnoozes();
+  const el = document.getElementById('alarm');
+
+  el.innerHTML = `
+    <div class="apic">${t.photo?`<img src="${t.photo}" alt="">`:t.icon}</div>
+    <h2>Time to</h2>
+    <div class="aname">${esc(t.name)}</div>
+    <div class="asub">${pretty(t.time)}</div>
+    <div class="abtns">
+      ${(t.steps||[]).length
+        ? `<button class="adid" id="aSteps" style="background:#2B4FD0">📋 &nbsp;Show me how</button>`
+        : t.outfit
+        ? `<button class="adid" id="aDress" style="background:#2B4FD0">👕 &nbsp;Pick clothes</button>`
+        : t.timer > 0
+        ? `<button class="adid" id="aStart" style="background:#2B4FD0">▶ &nbsp;Start · ${Math.round(t.timer/60)} min</button>`
+        : `<button class="adid" id="aDid">✓ &nbsp;I did it</button>`}
+      ${canWait
+        ? `<button class="alater" id="aLater">Not yet · remind me in ${snoozeMins()} minutes</button>`
+        : `<button class="ahelp" id="aHelp">🆘 &nbsp;I need help with this</button>`}
+    </div>
+    ${s.count ? `<div class="acount">Asked ${s.count} time${s.count>1?'s':''} already today</div>` : ''}`;
+
+  el.classList.remove('hide');
+  ring();
+  alarmTimer = setInterval(ring, 26000);      // keeps asking until answered
+
+  // keep the screen awake while an alarm is up
+  try{ if('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); }catch(e){}
+
+  // backstop only, in case the tablet is on another screen
+  if('Notification' in window && Notification.permission==='granted'){
+    try{ new Notification('Time to '+t.name.toLowerCase(),{body:'Open IndependentME',tag:sKey(t),requireInteraction:true}); }catch(e){}
+  }
+}
+
+function ring(){
+  if(!alarmTask) return;
+  chime([880,660,880]);
+  speak('Time to '+alarmTask.name.toLowerCase());
+}
+
+function closeAlarm(){
+  clearInterval(alarmTimer); alarmTimer=null;
+  document.getElementById('alarm').classList.add('hide');
+  try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){}
+  try{ speechSynthesis.cancel(); }catch(e){}
+  alarmTask = null;
+}
+
+function alarmDid(){
+  const t = alarmTask;
+  closeAlarm();
+  toggle(t.id);
+}
+
+function alarmLater(){
+  const t = alarmTask, k = sKey(t);
+  const s = SNOOZE[k] || {count:0, until:0};
+  s.count++; s.until = Date.now() + snoozeMins()*60000;
+  SNOOZE[k] = s; LS.set('snooze', SNOOZE);
+  speak('Okay. I will ask again in '+snoozeMins()+' minutes.');
+  closeAlarm();
+
+  // let the caregiver know it is being put off, without saying anything to her
+  if(s.count >= 2){
+    QUEUE.push({path:'/alert', body:{
+      kind:'reminder',
+      text: t.name + ' put off ' + s.count + ' times (due ' + pretty(t.time) + ')'
+    }});
+    LS.set('queue',QUEUE); flushQueue();
+  }
+}
+
+function alarmHelp(){
+  // She picks who to ask. If that person doesn't answer, the worker opens it
+  // up to everyone after the grace period, so a bad guess never costs her.
+  const people=reachable();
+  const t=alarmTask;
+  if(!people.length){ sendHelp(t,null); return; }
+  const el=document.getElementById('alarm');
+  el.innerHTML=`
+    <h2>Who should I ask?</h2>
+    <div class="aname" style="font-size:38px;margin-bottom:26px">${esc(t.name)}</div>
+    <div class="grid2" style="max-width:640px;width:100%">
+      ${people.map(c=>`<button class="person" data-ask="${c.id}">
+        <div class="pic">${c.photo?`<img src="${c.photo}" alt="">`:c.icon}</div><b>${esc(c.name)}</b></button>`).join('')}
+    </div>
+    <div class="abtns"><button class="alater" id="aBack">Go back</button></div>`;
+  clearInterval(alarmTimer); alarmTimer=null;
+}
+
+function sendHelp(t, person){
+  QUEUE.push({path:'/alert', body:{
+    kind:'help',
+    who: person ? person.name : '',
+    text: 'Needs help with: ' + t.name
+  }});
+  LS.set('queue',QUEUE); flushQueue();
+  const k=todayKey()+'|'+t.id, sn=SNOOZE[k]||{count:0,until:0};
+  sn.until=Date.now()+15*60000;              // quiet while someone gets to her
+  SNOOZE[k]=sn; LS.set('snooze',SNOOZE);
+  closeAlarm();
+  const el=document.getElementById('cheer');
+  document.getElementById('cheerIcon').textContent='📨';
+  document.getElementById('cheerTitle').textContent='Asking now';
+  document.getElementById('cheerText').textContent = person ? person.name+' is being called.' : 'Someone is being called.';
+  el.classList.remove('hide'); setTimeout(()=>el.classList.add('hide'),2400);
+  speak(person ? 'Asking '+person.name+' now.' : 'Asking for help now.');
+}
+
+/* ============================================================
+   Who's reachable
+
+   She's only shown people who can answer. Seth mid-shift and Nan
+   in class aren't offered, because an unanswered ask is worse than
+   a shorter list. The fallback person is always shown, so she can
+   never arrive at an empty screen when she needs someone.
+   ============================================================ */
+function freeNow(p){
+  if(p.override==='free') return true;
+  if(p.override==='busy') return false;
+  const b=p.busy;
+  if(!b || !(b.days||[]).length) return true;
+  const now=new Date();
+  if(!b.days.includes(now.getDay())) return true;
+  const cur=now.getHours()*60+now.getMinutes();
+  return cur < mins(b.from) || cur >= mins(b.to);
+}
+
+function reachable(){
+  const all=(CFG&&CFG.contacts)||[];
+  const free=all.filter(p=>freeNow(p) || p.fallback);
+  return free.length ? free : all.filter(p=>p.fallback).concat(free).slice(0,4);
+}
+
+/* ---------- messages ---------- */
+let picked=null;
+function renderMsg(){
+  const body=document.getElementById('msgBody');
+  const title=document.getElementById('msgTitle'), sub=document.getElementById('msgSub');
+  const contacts=reachable(), phrases=(CFG&&CFG.phrases)||[];
+
+  if(!contacts.length){
+    title.firstChild.nodeValue='Messages'; sub.textContent='No people yet';
+    body.innerHTML=`<div class="empty"><em>👥</em>Nobody can be reached right now.</div>`;
+    return;
+  }
+  if(!picked){
+    title.firstChild.nodeValue='Messages'; sub.textContent='Pick a person';
+    const unread = MSGS.filter(m=>m.dir==='in'&&m.id>lastSeen);
+    let html='';
+    if(unread.length) html += `<div class="group-label">📩 New for you</div>`+unread.map(bubbleHTML).join('');
+    html += `<div class="group-label">Say something</div><div class="grid2">`+contacts.map(c=>
+      `<button class="person" data-contact="${c.id}"><div class="pic">${c.photo?`<img src="${c.photo}" alt="">`:c.icon}</div><b>${esc(c.name)}</b></button>`
+    ).join('')+`</div>`;
+    const recent = MSGS.filter(m=>!(m.dir==='in'&&m.id>lastSeen)).slice(-8).reverse();
+    if(recent.length) html += `<div class="group-label">Earlier</div>`+recent.map(bubbleHTML).join('');
+    body.innerHTML=html;
+    if(unread.length){
+      lastSeen = Math.max.apply(null, unread.map(m=>m.id));
+      LS.set('lastSeen',lastSeen);
+      post('/seen',{ids:unread.map(m=>m.id)}).catch(()=>{});
+      updateBadge();
+    }
+    return;
+  }
+  const c=((CFG&&CFG.contacts)||[]).find(x=>x.id===picked);
+  if(!c){ picked=null; return renderMsg(); }
+  title.firstChild.nodeValue='Message '+c.name;
+  sub.textContent='Pick what to say';
+  body.innerHTML = `<button class="btn ghost" style="margin-bottom:18px;max-width:320px" data-back="1">← Pick someone else</button>`+
+    phrases.map(p=>`<button class="say" data-send="${p.id}"><em>${p.icon}</em><b>${esc(p.text)}</b></button>`).join('');
+}
+
+function bubbleHTML(m){
+  if(m.dir==='out') return `<div class="bubble mine"><em style="font-size:34px;font-style:normal">${m.icon||'💬'}</em>
+    <div><div class="who">You said to ${esc(m.who||'')}</div><div class="txt" style="font-size:21px">${esc(m.body)}</div></div></div>`;
+  return `<div class="bubble"><em style="font-size:40px;font-style:normal">${m.icon||'💬'}</em>
+    <div><div class="who">From ${esc(m.who||'someone')}</div><div class="txt">${esc(m.body)}</div>
+    <button class="hear" data-speak="${esc(m.body)}">🔊 Hear it again</button></div></div>`;
+}
+
+function send(phraseId){
+  const c=(CFG.contacts||[]).find(x=>x.id===picked);
+  const p=(CFG.phrases||[]).find(x=>x.id===phraseId);
+  if(!c||!p) return;
+  chime([784,988]); speak('Sent to '+c.name);
+  MSGS.push({id:-Date.now(),dir:'out',who:c.name,body:p.text,icon:p.icon,at:Date.now()});
+  LS.set('msgs',MSGS);
+  QUEUE.push({path:'/say',body:{who:c.name,text:p.text,icon:p.icon}});
+  LS.set('queue',QUEUE);
+  flushQueue();
+  picked=null; renderMsg();
+  const el=document.getElementById('cheer');
+  document.getElementById('cheerIcon').textContent='📨';
+  document.getElementById('cheerTitle').textContent='Sent!';
+  document.getElementById('cheerText').textContent = c.name+' will see it.';
+  el.classList.remove('hide'); setTimeout(()=>el.classList.add('hide'),1600);
+}
+
+/* ---------- wiring ---------- */
+document.addEventListener('click', e=>{
+  const t=e.target;
+  const go=t.closest('[data-go]');
+  if(go){
+    const v=go.dataset.go;
+    document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-current', x.dataset.go===v));
+    document.getElementById('view-home').classList.toggle('hide',v!=='home');
+    document.getElementById('view-msg').classList.toggle('hide',v!=='msg');
+    if(v==='msg'){ picked=null; renderMsg(); } else renderHome();
+    return;
+  }
+  const wr=t.closest('[data-wear]');
+  if(wr){
+    const item=((CFG&&CFG.wardrobe)||[]).find(x=>x.id===wr.dataset.wear);
+    if(item){ picked_[item.layer] = picked_[item.layer]===item.id ? null : item.id; speak(item.name); drawOutfit(); }
+    return;
+  }
+  if(t.closest('#oDone')){ const task=outfitTask; closeOutfit(); toggle(task.id); return; }
+  if(t.closest('#oBack')){ closeOutfit(); return; }
+  const dr=t.closest('[data-dress]');
+  if(dr){ const task=tasks().find(x=>x.id===dr.dataset.dress); if(task) openOutfit(task); return; }
+  if(t.closest('#aDress')){ const task=alarmTask; closeAlarm(); openOutfit(task); return; }
+  if(t.closest('#sNext')){ nextStep(); return; }
+  if(t.closest('#sBack')){ prevStep(); return; }
+  if(t.closest('#sStop')){ closeSteps(); speak('Okay. You can come back to it.'); return; }
+  if(t.closest('#sDone')){ const task=stepTask; closeSteps(); toggle(task.id); return; }
+  if(t.closest('#warnOk')){ document.getElementById('warnbar').classList.add('hide'); return; }
+  const sx=t.closest('[data-steps]');
+  if(sx){ const task=tasks().find(x=>x.id===sx.dataset.steps); if(task) openSteps(task); return; }
+  if(t.closest('#aSteps')){ const task=alarmTask; closeAlarm(); openSteps(task); return; }
+  const evb=t.closest('[data-ev]'); if(evb){ tellEvent(evb.dataset.ev); return; }
+  if(t.closest('#askPhoto')){ sendPhoto(); return; }
+  if(t.closest('#askNo')){ declineAsk(); return; }
+  if(t.closest('#askCall')){ const m=askMsg; const room='r'+Date.now()+Math.random().toString(36).slice(2,6);
+    HANDLED[m.id]=true; LS.set('handled',HANDLED); closeAsk(); startCall(room,'a',m.who); return; }
+  if(t.closest('#askAnswer')){ const m=askMsg; closeAsk(); startCall(m.room,'b',m.who); return; }
+  if(t.closest('#cHang')){ endCall(); return; }
+  if(t.closest('#cFlip')){ flipCamera(); return; }
+  if(t.closest('#tStop')){ cancelTimer(); return; }
+  if(t.closest('#tFinish')){ finishTimer(); return; }
+  const st=t.closest('[data-start]');
+  if(st){ const task=tasks().find(x=>x.id===st.dataset.start); if(task) openTimer(task); return; }
+  if(t.closest('#aStart')){ const task=alarmTask; closeAlarm(); openTimer(task); return; }
+  if(t.closest('#aDid')){ alarmDid(); return; }
+  if(t.closest('#aLater')){ alarmLater(); return; }
+  if(t.closest('#aHelp')){ alarmHelp(); return; }
+  if(t.closest('#aBack')){ openAlarm(alarmTask); return; }
+  const ask=t.closest('[data-ask]');
+  if(ask){ sendHelp(alarmTask, (CFG.contacts||[]).find(x=>x.id===ask.dataset.ask)); return; }
+
+  const tg=t.closest('[data-toggle]'); if(tg){ toggle(tg.dataset.toggle); return; }
+  const sp=t.closest('[data-speak]'); if(sp){ speak(sp.dataset.speak); return; }
+  const pc=t.closest('[data-contact]'); if(pc){ picked=pc.dataset.contact; renderMsg(); return; }
+  if(t.closest('[data-back]')){ picked=null; renderMsg(); return; }
+  const sd=t.closest('[data-send]'); if(sd){ send(sd.dataset.send); return; }
+
+  if(t.id==='setupClose'){ document.getElementById('setup').classList.add('hide'); return; }
+  if(t.id==='tSpeak'){ SPEAK=!SPEAK; LS.set('speak',SPEAK); t.setAttribute('aria-pressed',SPEAK); return; }
+  if(t.id==='tSound'){ SOUND=!SOUND; LS.set('sound',SOUND); t.setAttribute('aria-pressed',SOUND); if(SOUND) chime(); return; }
+  if(t.id==='askNotif'){
+    if('Notification' in window) Notification.requestPermission().then(p=>{
+      t.textContent = p==='granted' ? '✓ Notifications are on' : 'Blocked in tablet settings';
+    });
+    return;
+  }
+  if(t.id==='fSave'){
+    HOUSE=document.getElementById('fHouse').value.trim();
+    API=document.getElementById('fApi').value.trim();
+    LS.set('house',HOUSE); LS.set('api',API);
+    document.getElementById('connState').textContent='Connecting…';
+    sync().then(()=>{
+      document.getElementById('connState').textContent =
+        online ? '✓ Connected. Setup loaded from the caregiver app.' : 'No answer. Check the address and try again.';
+    });
+    return;
+  }
+});
+
+(function(){
+  const g=document.getElementById('gear');
+  const open=()=>{
+    document.getElementById('setup').classList.remove('hide');
+    document.getElementById('fHouse').value=HOUSE;
+    document.getElementById('fApi').value=API;
+    document.getElementById('tSpeak').setAttribute('aria-pressed',SPEAK);
+    document.getElementById('tSound').setAttribute('aria-pressed',SOUND);
+    document.getElementById('connState').textContent = online?'\u2713 Connected':'Not connected';
+  };
+
+  // Pointer events only. Mixing touch and mouse listeners meant Android could
+  // fire a cancel partway through the hold and silently kill the timer.
+  let timer;
+  const start=()=>{ g.classList.add('holding'); clearTimeout(timer); timer=setTimeout(()=>{ g.classList.remove('holding'); open(); },900); };
+  const stop =()=>{ g.classList.remove('holding'); clearTimeout(timer); };
+  g.addEventListener('pointerdown',start);
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>g.addEventListener(ev,stop));
+  g.addEventListener('contextmenu',e=>e.preventDefault());
+
+  // Backup: five quick taps anywhere in the top right corner. Harder for her
+  // to do by accident than a hold, and it works if the gear won't cooperate.
+  let taps=[];
+  document.addEventListener('pointerdown',e=>{
+    if(e.clientY>110 || e.clientX < window.innerWidth-110) return;
+    const now=Date.now();
+    taps=taps.filter(t=>now-t<2500); taps.push(now);
+    if(taps.length>=5){ taps=[]; open(); }
+  });
+})();
+
+(function(){
+  const m={name:'IndependentME',short_name:'IndependentME',display:'standalone',
+    background_color:'#F4C77E',theme_color:'#F4C77E',start_url:'.',
+    icons:[{src:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="110" fill="#F4C77E"/><path d="M140 268l70 70 165-165" fill="none" stroke="#22201C" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/></svg>'),sizes:'512x512',type:'image/svg+xml'}]};
+  const l=document.createElement('link'); l.rel='manifest';
+  l.href=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/json'}));
+  document.head.appendChild(l);
+})();
+
+renderHome(); renderMsg(); updateBadge();
+sync(); loadWeather();
+setInterval(loadWeather, 1800000);
+setInterval(sync,25000);
+setInterval(()=>{ renderHome(); checkWarnings(); checkReminders(); },15000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ sync(); checkReminders(); } });
+setTimeout(checkReminders, 2500);
+</script>
+</body>
+</html>
