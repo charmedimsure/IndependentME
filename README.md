@@ -40,7 +40,22 @@ Note the deployed URL, something like `https://independentme.your-account.worker
 
 ## 2. Front ends
 
-Drop `independentme.html` and `care.html` in a GitHub Pages repo. Both are single files with no build step.
+The `docs` folder holds everything the browser needs:
+
+```
+docs/
+├── index.html            ← independentme.html, renamed
+├── care.html
+├── sw.js
+├── manifest.json
+├── manifest-care.json
+├── icon-192.png
+├── icon-512.png
+├── icon-care-192.png
+└── icon-care-512.png
+```
+
+The manifests and service worker are what make both apps properly installable — a real icon on the home screen, opening full screen with no browser chrome, and still opening when the wifi is down. There's an **Add to the home screen** button in each app's setup.
 
 ## 3. Pick two codes
 
@@ -100,6 +115,16 @@ Adjust the temperature ranges to suit her; if she runs cold, push the coat up to
 Then mark a task as the dressing one and its button becomes **Pick clothes** instead of a checkmark. That screen shows the weather big, a red banner if there's something to know, and only the clothes that suit today's temperature, grouped into coat / shirt / pants / shoes. She taps what she wants and hits **I'm dressed**.
 
 She picks. The app narrows the closet, which is the genuinely hard part, and leaves the choosing to her. Her picks aren't reported back to you.
+
+## If the voice doesn't work
+
+Tablet setup has a **Test the voice** button. If you hear nothing:
+
+- Check the tablet's media volume, not just the ringer
+- Settings → Accessibility → Text-to-speech output. If nothing's listed, install **Google Text-to-speech** from the Play Store
+- Android won't speak until the screen has been touched once, which is handled automatically, but it does mean the very first prompt after a restart can be silent
+
+Speech rate is adjustable from the tablet as well as the care app. Hearing loss is common with Down syndrome and often undetected, so slower and louder is usually the right call.
 
 ## Checking in on her
 

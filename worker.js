@@ -297,11 +297,21 @@ export default {
           if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
           if (!body.config) return json({ error: 'Missing config' }, 400);
 
+          const now = Date.now();
           await env.DB.prepare(
             `INSERT INTO household (code, care, config, updated) VALUES (?, ?, ?, ?)
-             ON CONFLICT(code) DO UPDATE SET config = excluded.config, updated = excluded.updated`
-          ).bind(house, body.care || '', JSON.stringify(body.config), Date.now()).run();
-          return json({ ok: true });
+             ON CONFLICT(code) DO UPDATE SET
+               config  = excluded.config,
+               updated = excluded.updated,
+               care    = CASE WHEN household.care IS NULL OR household.care = ''
+                              THEN excluded.care ELSE household.care END`
+          ).bind(house, body.care || '', JSON.stringify(body.config), now).run();
+
+          // Echo back what was actually stored, so the app can confirm the write
+          // landed rather than assuming it did.
+          const saved = await env.DB.prepare('SELECT config, updated FROM household WHERE code = ?')
+            .bind(house).first();
+          return json({ ok: true, updated: saved ? saved.updated : now, config: saved ? JSON.parse(saved.config) : body.config });
         }
 
         /* ---------- mark messages read ---------- */

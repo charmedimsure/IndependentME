@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#14161C">
 <meta name="mobile-web-app-capable" content="yes">
 <title>IndependentME · Care</title>
+<link rel="manifest" href="manifest-care.json">
+<link rel="apple-touch-icon" href="icon-care-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
@@ -105,6 +107,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 .tab[aria-current="true"]{color:var(--amber)}
 .tab .bdg{position:absolute;top:2px;right:calc(50% - 24px);min-width:19px;height:19px;border-radius:10px;background:var(--miss);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 5px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+.pic svg,.tico svg,.spic svg,.oitem .pic svg,.emojis svg,.apic svg{width:62%;height:62%;color:currentColor}
+.spic svg{width:58%;height:58%}
 </style>
 </head>
 <body>
@@ -148,6 +152,24 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 <div class="lightbox hide" id="lightbox"></div>
 <div class="callwrap hide" id="callwrap"></div>
 <script>
+/* ============================================================
+   Drawn icons for things emoji has no answer for. A towel is not
+   toilet paper and a sweater is not a ball of yarn; at her level
+   the picture has to be the right object, not a near miss.
+   Used anywhere an icon value starts with "svg:".
+   ============================================================ */
+const SVGI = {
+  towel:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10h32a6 6 0 0 1 6 6v38a4 4 0 0 1-4 4H18a6 6 0 0 1-6-6V16a6 6 0 0 1 4-5.7z"/><path d="M16 10a6 6 0 0 0 0 12h8V10"/><path d="M22 32h20M22 40h20"/></svg>',
+  sweater:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10h16l12 7-5 11-5-2.5V54H22V25.5L17 28l-5-11z"/><path d="M24 10c0 4.5 3.6 7 8 7s8-2.5 8-7"/><path d="M22 46h20"/></svg>',
+  toothbrush:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 54 44 22"/><path d="M40 10l12 9-8 11-12-9z"/><path d="M18 50l-4 6 7-2z"/></svg>',
+  hairbrush:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="8" width="24" height="26" rx="12"/><path d="M28 38v14a4 4 0 0 0 8 0V38"/><path d="M26 16v6M32 14v8M38 16v6"/></svg>',
+  soap:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="30" width="44" height="22" rx="8"/><path d="M18 30c0-7 6-11 14-11s14 4 14 11"/><circle cx="24" cy="14" r="4"/><circle cx="38" cy="9" r="3"/></svg>',
+  shirt:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 9h16l14 8-6 12-6-3v28H22V26l-6 3-6-12z"/><path d="M24 9c0 4 3.6 6.5 8 6.5S40 13 40 9"/></svg>'
+};
+const icoHTML = v => (v && String(v).startsWith('svg:'))
+  ? (SVGI[String(v).slice(4)] || '')
+  : (v || '');
+
 const LS={
   get(k,d){ try{const v=localStorage.getItem('imec.'+k); return v?JSON.parse(v):d;}catch(e){return d;} },
   set(k,v){ try{localStorage.setItem('imec.'+k,JSON.stringify(v));}catch(e){} }
@@ -169,6 +191,7 @@ let API=LS.get('api',''), HOUSE=LS.get('house',''), CARE=LS.get('care',''), ME=L
 })();
 let CFG=LS.get('config',null), DONE=[], MSGS=[], WEEK=[], PHOTOS=[];
 let online=false, tab='today', lastCount=0;
+let savedAt=LS.get('savedAt',0), saving=false;
 
 const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const D3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -206,9 +229,9 @@ const blank=()=>({
   lat:39.7137, lon:-82.5993, place:'Lancaster, Ohio',
   wardrobe:[
     {id:uid(),name:'Warm coat',       icon:'🧥',photo:null,layer:'outer', minF:-20,maxF:48, rain:false},
-    {id:uid(),name:'Sweater',         icon:'🧶',photo:null,layer:'outer', minF:40, maxF:65, rain:false},
+    {id:uid(),name:'Sweater',         icon:'svg:sweater',photo:null,layer:'outer', minF:40, maxF:65, rain:false},
     {id:uid(),name:'Raincoat',        icon:'☔',photo:null,layer:'outer', minF:33, maxF:120,rain:true},
-    {id:uid(),name:'T-shirt',         icon:'👕',photo:null,layer:'top',   minF:62, maxF:120,rain:false},
+    {id:uid(),name:'T-shirt',         icon:'svg:shirt',photo:null,layer:'top',   minF:62, maxF:120,rain:false},
     {id:uid(),name:'Long sleeves',    icon:'👚',photo:null,layer:'top',   minF:-20,maxF:68, rain:false},
     {id:uid(),name:'Shorts',          icon:'🩳',photo:null,layer:'bottom',minF:70, maxF:120,rain:false},
     {id:uid(),name:'Pants',           icon:'👖',photo:null,layer:'bottom',minF:-20,maxF:78, rain:false},
@@ -232,7 +255,7 @@ const blank=()=>({
       {id:uid(),icon:'🧼',label:'Wash your body with soap',photo:null},
       {id:uid(),icon:'🚿',label:'Rinse the soap off',photo:null},
       {id:uid(),icon:'🛑',label:'Turn the water off',photo:null},
-      {id:uid(),icon:'🧻',label:'Dry with your towel',photo:null}
+      {id:uid(),icon:'svg:towel',label:'Dry with your towel',photo:null}
     ]},
     {id:uid(),name:'Brush teeth',icon:'🪥',photo:null,time:'21:00',freq:'daily',days:[],timer:180},
     {id:uid(),name:'Wash hair',rollover:true,icon:'🧴',photo:null,time:'18:00',freq:'weekly',days:[0,3]},
@@ -269,7 +292,12 @@ async function pull(){
     const r=await fetch(base+'/pull?house='+encodeURIComponent(HOUSE)+'&day='+key());
     if(!r.ok) throw 0;
     const d=await r.json();
-    if(d.config) { CFG=d.config; LS.set('config',CFG); }
+    // Only adopt the server's copy if it's at least as new as our last save and
+    // nothing is being edited. A refresh must never eat work in progress.
+    if(d.config && !saving && !sub && (d.updated||0) >= savedAt){
+      CFG=d.config; LS.set('config',CFG);
+      savedAt=d.updated||savedAt; LS.set('savedAt',savedAt);
+    }
     DONE=d.done||[]; PHOTOS=d.photos||[]; 
     const prev=MSGS.filter(m=>m.dir==='out').length;
     MSGS=d.messages||[];
@@ -339,7 +367,7 @@ function viewToday(){
       const at=doneMap[t.id];
       const late=!at && effT(t)<nowM-30;
       return `<div class="trow">
-        <div class="tico">${t.photo?`<img src="${t.photo}">`:t.icon}</div>
+        <div class="tico">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
         <div class="tmain"><div class="tname">${esc(t.name)}</div>
           <div class="tsub">${effT(t)!==mins(t.time)?'after she is home':pretty(t.time)}${t.freq==='weekly'?' · weekly':''}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
         <div class="tstat ${at?'s-ok':late?'s-late':'s-wait'}">${at?'✓ '+clock(at):late?'past due':'waiting'}</div>
@@ -485,7 +513,7 @@ function viewSetup(){
 
   <div class="panel"><h3>Things to do</h3>
     ${(CFG&&CFG.tasks||[]).slice().sort((a,b)=>mins(a.time)-mins(b.time)).map(t=>`
-      <div class="trow"><div class="tico">${t.photo?`<img src="${t.photo}">`:t.icon}</div>
+      <div class="trow"><div class="tico">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
       <div class="tmain"><div class="tname">${esc(t.name)}</div>
         <div class="tsub">${t.freq==='daily'?'Every day':(t.days||[]).map(d=>D3[d]).join(', ')||'no days set'} · ${pretty(t.time)}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
       <button class="tstat s-wait" data-etask="${t.id}">edit</button></div>`).join('')
@@ -517,7 +545,7 @@ function viewSetup(){
 
   <div class="panel"><h3>Her clothes</h3>
     ${(CFG&&CFG.wardrobe||[]).map(w=>`
-      <div class="trow"><div class="tico">${w.photo?`<img src="${w.photo}">`:w.icon}</div>
+      <div class="trow"><div class="tico">${w.photo?`<img src="${w.photo}">`:icoHTML(w.icon)}</div>
       <div class="tmain"><div class="tname">${esc(w.name)}</div>
         <div class="tsub">${({outer:'Coat',top:'Shirt',bottom:'Pants',feet:'Shoes',extra:'Also'})[w.layer]||w.layer} · ${w.minF}°–${w.maxF}°${w.rain?' · rain':''}</div></div>
       <button class="tstat s-wait" data-eward="${w.id}">edit</button></div>`).join('')
@@ -528,7 +556,7 @@ function viewSetup(){
 
   <div class="panel"><h3>People she can message</h3>
     ${(CFG&&CFG.contacts||[]).map(c=>`
-      <div class="trow"><div class="tico" style="border-radius:50%">${c.photo?`<img src="${c.photo}">`:c.icon}</div>
+      <div class="trow"><div class="tico" style="border-radius:50%">${c.photo?`<img src="${c.photo}">`:icoHTML(c.icon)}</div>
       <div class="tmain"><div class="tname">${esc(c.name)}</div>
         <div class="tsub">${careFree(c)?'available now':'not available now'}${c.fallback?' · always shown':''}${c.ntfy?'':' · no alerts set up'}</div></div>
       <button class="tstat s-wait" data-econ="${c.id}">edit</button></div>`).join('')
@@ -545,12 +573,13 @@ function viewSetup(){
     <button class="btn ghost" style="margin-top:14px" data-ephr="new">+ Add a phrase</button>
   </div>
 
-  <div class="panel"><h3>Alerts on this phone</h3>
+  <div class="panel"><h3>This phone</h3>
     <button class="btn ghost" id="askNotif">Turn on notifications</button>
+    <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
   </div>`;
 }
 
-const TASK_ICONS=['🪥','💇','🚿','🛁','👕','🥣','🍎','💊','🧴','🧺','🛏️','💅','🚽','🧼','🧹','🗑️','👟','🎒','📺','🐕','☎️','💧','🌙','🧦','🪒','🧽','📅','🎵'];
+const TASK_ICONS=['svg:towel','svg:sweater','svg:toothbrush','svg:hairbrush','svg:soap','svg:shirt','🪥','💇','🚿','🛁','👕','🥣','🍎','💊','🧴','🧺','🛏️','💅','🚽','🧼','🧹','🗑️','👟','🎒','📺','🐕','☎️','💧','🌙','🧦','🪒','🧽','📅','🎵'];
 const PERSON_ICONS=['👩','👨','👵','👴','🧑','👧','👦','🐕','💗','🏠'];
 const SAY_ICONS=['👋','🆘','✅','🍽️','📞','❤️','😴','🤒','😊','😢','❓','🏠','🚗','🎉'];
 
@@ -563,12 +592,12 @@ function editTask(){
     <input id="dName" value="${esc(t.name)}" placeholder="Brush teeth">
     <label class="f">Picture</label>
     <div class="row" style="align-items:center">
-      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px">${t.photo?`<img src="${t.photo}">`:t.icon}</div>
+      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
       <div style="flex:1"><button class="btn ghost" id="dPhoto">Use a photo</button>
       ${t.photo?`<button class="btn ghost" style="margin-top:8px" id="dNoPhoto">Remove photo</button>`:''}</div>
     </div>
     <input type="file" accept="image/*" id="dFile" style="display:none">
-    <div class="emojis" id="dIcons">${TASK_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===t.icon}">${e}</button>`).join('')}</div>
+    <div class="emojis" id="dIcons">${TASK_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===t.icon}">${icoHTML(e)}</button>`).join('')}</div>
     <label class="f">How often</label>
     <div class="row">
       <button class="chip" id="fD" aria-pressed="${t.freq==='daily'}">Every day</button>
@@ -591,7 +620,7 @@ function editTask(){
 
     <label class="f">Step by step</label>
     <div id="stepList">${(t.steps||[]).map((st,i)=>`
-      <div class="trow"><div class="tico">${st.photo?`<img src="${st.photo}">`:st.icon}</div>
+      <div class="trow"><div class="tico">${st.photo?`<img src="${st.photo}">`:icoHTML(st.icon)}</div>
       <div class="tmain"><div class="tname">${i+1}. ${esc(st.label)}</div></div>
       <button class="tstat s-wait" data-stepup="${st.id}">↑</button>
       <button class="tstat s-wait" data-stepdel="${st.id}">✕</button></div>`).join('')}</div>
@@ -626,7 +655,7 @@ function editContact(){
     <input id="dName" value="${esc(c.name)}" placeholder="Mom">
     <label class="f">Picture</label>
     <div class="row" style="align-items:center">
-      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px;border-radius:50%">${c.photo?`<img src="${c.photo}">`:c.icon}</div>
+      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px;border-radius:50%">${c.photo?`<img src="${c.photo}">`:icoHTML(c.icon)}</div>
       <div style="flex:1"><button class="btn ghost" id="dPhoto">Use a photo</button></div>
     </div>
     <input type="file" accept="image/*" id="dFile" style="display:none">
@@ -670,7 +699,7 @@ function editContact(){
     <p class="note" style="margin-top:12px">Messages go to this app, not to a phone number. Anyone you want to receive them opens the care page with the same codes.</p>
   </div>`;
 }
-const WEAR_ICONS=['🧥','🧣','🧤','👕','👚','👔','🥼','👖','🩳','👗','🧦','👟','👢','🥾','🩴','🧢','☂️','🕶️','🎒'];
+const WEAR_ICONS=['svg:sweater','svg:shirt','svg:towel','🧥','🧣','🧤','👕','👚','👔','🥼','👖','🩳','👗','🧦','👟','👢','🥾','🩴','🧢','☂️','🕶️','🎒'];
 const EV_ICONS=['🚐','🏫','🎨','🎳','🎬','🛒','🏊','🍽️','🎂','💈','🩺','🦷','🚗','🏡','👵','👨','🎵','⛪','🐕','📦'];
 function editEvent(){
   const e=draft;
@@ -731,11 +760,11 @@ function editWard(){
     <input id="dName" value="${esc(w.name)}" placeholder="Sweater">
     <label class="f">Picture</label>
     <div class="row" style="align-items:center">
-      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px">${w.photo?`<img src="${w.photo}">`:w.icon}</div>
+      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px">${w.photo?`<img src="${w.photo}">`:icoHTML(w.icon)}</div>
       <div style="flex:1"><button class="btn ghost" id="dPhoto">Add a photo (optional)</button></div>
     </div>
     <input type="file" accept="image/*" id="dFile" style="display:none">
-    <div class="emojis" id="dIcons">${WEAR_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===w.icon}">${e}</button>`).join('')}</div>
+    <div class="emojis" id="dIcons">${WEAR_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===w.icon}">${icoHTML(e)}</button>`).join('')}</div>
     <label class="f">What kind</label>
     <select id="dLayer">${[['outer','Coat or jacket'],['top','Shirt or top'],['bottom','Pants or skirt'],['feet','Shoes'],['extra','Hat, gloves, umbrella']]
       .map(([v,l])=>`<option value="${v}" ${w.layer===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -804,10 +833,36 @@ function shrink(file,cb){
   r.readAsDataURL(file);
 }
 
-async function saveConfig(){
-  if(!API||!HOUSE||!CARE){ alert('Add the worker address, household code, and caregiver key first.'); return; }
-  try{ await post('/config',{config:CFG}); LS.set('config',CFG); setConn(true); }
-  catch(e){ alert('Could not save: '+e.message); }
+async function saveConfig(btn){
+  if(!API||!HOUSE||!CARE){ alert('Add the worker address, household code, and caregiver key first.'); return false; }
+  const label = btn ? btn.textContent : null;
+  if(btn){ btn.textContent='Saving…'; btn.disabled=true; }
+  saving=true;
+  try{
+    const r=await post('/config',{config:CFG});
+    if(r && r.config) CFG=r.config;
+    savedAt=(r&&r.updated)||Date.now(); LS.set('savedAt',savedAt);
+    LS.set('config',CFG); setConn(true);
+    saving=false;
+    if(btn){ btn.textContent='Saved ✓'; btn.style.background='var(--ok)'; btn.style.color='#fff'; }
+    toast('Saved');
+    return true;
+  }catch(e){
+    saving=false;
+    if(btn){ btn.textContent=label; btn.disabled=false; }
+    alert('Could not save: '+e.message+'\n\nNothing was lost — try again.');
+    return false;
+  }
+}
+
+function toast(msg){
+  let el=document.getElementById('toast');
+  if(!el){ el=document.createElement('div'); el.id='toast';
+    el.style.cssText='position:fixed;left:50%;transform:translateX(-50%);bottom:96px;background:var(--ok);color:#fff;'+
+      'padding:13px 22px;border-radius:22px;font-weight:800;z-index:90;box-shadow:0 10px 30px rgba(0,0,0,.4)';
+    document.body.appendChild(el); }
+  el.textContent=msg; el.style.display='block';
+  clearTimeout(toast._t); toast._t=setTimeout(()=>{ el.style.display='none'; }, 1800);
 }
 
 /* ---------- events ---------- */
@@ -822,14 +877,15 @@ document.addEventListener('click',async e=>{
     CARE=document.getElementById('sCare').value.trim();
     LS.set('api',API); LS.set('house',HOUSE); LS.set('care',CARE);
     if(!CFG) CFG=blank();
-    await saveConfig(); await pull(); return;
+    if(await saveConfig(t)) await pull();
+    return;
   }
   if(t.id==='saveName'){
     CFG=CFG||blank();
     CFG.name=document.getElementById('sName').value.trim();
     CFG.ntfy=document.getElementById('sNtfy').value.trim();
     CFG.speechRate=parseFloat(document.getElementById('sRate').value);
-    await saveConfig(); render(); return;
+    await saveConfig(t); return;
   }
   if(t.id==='saveMe'){ ME=document.getElementById('sMe').value; LS.set('me',ME); render(); return; }
   if(t.id==='invite'){
@@ -847,7 +903,12 @@ document.addEventListener('click',async e=>{
     CFG.maxSnoozes=+document.getElementById('sMax').value;
     CFG.helpFallbackMinutes=+document.getElementById('sFallback').value;
     CFG.nudgeTo=document.getElementById('sNudge').value;
-    await saveConfig(); render(); return;
+    await saveConfig(t); return;
+  }
+  if(t.id==='installApp'){
+    if(installPrompt){ installPrompt.prompt(); installPrompt=null; }
+    else alert('Use your browser menu, then Add to Home screen.');
+    return;
   }
   if(t.id==='askNotif'){ if('Notification' in window) Notification.requestPermission().then(p=>{ t.textContent = p==='granted'?'✓ Notifications are on':'Blocked in phone settings'; }); return; }
 
@@ -958,7 +1019,7 @@ document.addEventListener('click',async e=>{
     CFG.place=document.getElementById('sPlace').value.trim();
     CFG.lat=parseFloat(document.getElementById('sLat').value);
     CFG.lon=parseFloat(document.getElementById('sLon').value);
-    await saveConfig(); render(); return;
+    await saveConfig(t); return;
   }
   const ep=t.closest('[data-ephr]');
   if(ep){
@@ -973,7 +1034,7 @@ document.addEventListener('click',async e=>{
   if(ic){
     draft.icon=ic.dataset.i; draft.photo=null;
     document.querySelectorAll('#dIcons button').forEach(x=>x.setAttribute('aria-pressed',x.dataset.i===draft.icon));
-    const p=document.getElementById('dPrev'); if(p) p.innerHTML=draft.icon;
+    const p=document.getElementById('dPrev'); if(p) p.innerHTML=icoHTML(draft.icon);
     return;
   }
   if(t.id==='dPhoto'){ document.getElementById('dFile').click(); return; }
@@ -1038,7 +1099,8 @@ document.addEventListener('click',async e=>{
       const i=CFG.phrases.findIndex(x=>x.id===draft.id);
       if(i>-1) CFG.phrases[i]=rec; else CFG.phrases.push(rec);
     }
-    await saveConfig(); sub=null; draft=null; render(); return;
+    if(await saveConfig(t)){ sub=null; draft=null; setTimeout(render,450); }
+    return;
   }
   if(t.id==='dDel'){
     if(sub==='task') CFG.tasks=CFG.tasks.filter(x=>x.id!==draft.id);
@@ -1046,7 +1108,8 @@ document.addEventListener('click',async e=>{
     if(sub==='phrase') CFG.phrases=CFG.phrases.filter(x=>x.id!==draft.id);
     if(sub==='ward') CFG.wardrobe=CFG.wardrobe.filter(x=>x.id!==draft.id);
     if(sub==='event') CFG.events=CFG.events.filter(x=>x.id!==draft.id);
-    await saveConfig(); sub=null; draft=null; render(); return;
+    if(await saveConfig(t)){ sub=null; draft=null; setTimeout(render,450); }
+    return;
   }
 });
 
@@ -1074,7 +1137,7 @@ async function beginCall(){
   room='r'+Date.now()+Math.random().toString(36).slice(2,6); side='a'; since=0;
   callShell('Ringing…');
   try{ localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); }
-  catch(e){ alert('Could not open your camera: '+e.message); return hangUp(); }
+  catch(e){ alert('Could not open your camera or microphone.\n\n'+e.name+': '+e.message); return hangUp(); }
   document.getElementById('vNear').srcObject=localStream;
 
   const ice=(CFG&&CFG.turn&&CFG.turn.urls)
@@ -1115,9 +1178,13 @@ function hangUp(){
   const w=document.getElementById('callwrap'); w.classList.add('hide'); w.innerHTML='';
 }
 
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+let installPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installPrompt=e; });
+
 render(); pull();
-setInterval(()=>{ if(tab!=='setup') pull(); }, 15000);
-document.addEventListener('visibilitychange',()=>{ if(!document.hidden) pull(); });
+setInterval(()=>{ if(tab!=='setup' && !sub && !saving) pull(); }, 15000);
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && !sub && !saving) pull(); });
 </script>
 </body>
 </html>

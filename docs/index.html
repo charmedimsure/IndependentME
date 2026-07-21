@@ -6,6 +6,8 @@
 <meta name="theme-color" content="#F4C77E">
 <meta name="mobile-web-app-capable" content="yes">
 <title>IndependentME</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;600;800&display=swap" rel="stylesheet">
@@ -262,6 +264,8 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
 .gear.holding:after{transform:scale(1);opacity:.9;transition:transform .9s linear,opacity .15s}
 .offline{position:fixed;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top));background:var(--ink);color:var(--sky-1);padding:8px 16px;border-radius:20px;font-size:13px;font-weight:800;z-index:60}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.pic svg,.tico svg,.spic svg,.oitem .pic svg,.emojis svg,.apic svg{width:62%;height:62%;color:currentColor}
+.spic svg{width:58%;height:58%}
 </style>
 </head>
 <body data-part="morning">
@@ -323,7 +327,17 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
       <button class="chip" id="tSpeak">🔊 Read aloud</button>
       <button class="chip" id="tSound">🔔 Chime</button>
     </div>
+    <label class="f">How fast she's spoken to</label>
+    <div class="row">
+      <button class="chip" data-rate="0.6">Very slow</button>
+      <button class="chip" data-rate="0.7">Slow</button>
+      <button class="chip" data-rate="0.8">Steady</button>
+      <button class="chip" data-rate="0.9">Normal</button>
+    </div>
+    <button class="btn ghost" style="margin-top:12px" id="testVoice">🔊 Test the voice</button>
+    <p class="note" style="margin-top:8px" id="voiceState"></p>
     <button class="btn ghost" style="margin-top:16px" id="askNotif">Turn on notifications</button>
+    <button class="btn" style="margin-top:12px" id="installApp">Add to the home screen</button>
     <p class="note" style="margin-top:12px">Reminders sound while IndependentME is on screen. Leave the app open and the tablet plugged in. For anything that truly cannot be missed, set a backup alarm in the tablet's Clock app too.</p>
   </div>
 </div>
@@ -333,6 +347,24 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
    Local cache first. The tablet always works offline; the worker
    is what it syncs to, not what it depends on to function.
    ============================================================ */
+/* ============================================================
+   Drawn icons for things emoji has no answer for. A towel is not
+   toilet paper and a sweater is not a ball of yarn; at her level
+   the picture has to be the right object, not a near miss.
+   Used anywhere an icon value starts with "svg:".
+   ============================================================ */
+const SVGI = {
+  towel:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10h32a6 6 0 0 1 6 6v38a4 4 0 0 1-4 4H18a6 6 0 0 1-6-6V16a6 6 0 0 1 4-5.7z"/><path d="M16 10a6 6 0 0 0 0 12h8V10"/><path d="M22 32h20M22 40h20"/></svg>',
+  sweater:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10h16l12 7-5 11-5-2.5V54H22V25.5L17 28l-5-11z"/><path d="M24 10c0 4.5 3.6 7 8 7s8-2.5 8-7"/><path d="M22 46h20"/></svg>',
+  toothbrush:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 54 44 22"/><path d="M40 10l12 9-8 11-12-9z"/><path d="M18 50l-4 6 7-2z"/></svg>',
+  hairbrush:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="8" width="24" height="26" rx="12"/><path d="M28 38v14a4 4 0 0 0 8 0V38"/><path d="M26 16v6M32 14v8M38 16v6"/></svg>',
+  soap:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="10" y="30" width="44" height="22" rx="8"/><path d="M18 30c0-7 6-11 14-11s14 4 14 11"/><circle cx="24" cy="14" r="4"/><circle cx="38" cy="9" r="3"/></svg>',
+  shirt:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 9h16l14 8-6 12-6-3v28H22V26l-6 3-6-12z"/><path d="M24 9c0 4 3.6 6.5 8 6.5S40 13 40 9"/></svg>'
+};
+const icoHTML = v => (v && String(v).startsWith('svg:'))
+  ? (SVGI[String(v).slice(4)] || '')
+  : (v || '');
+
 const LS = {
   get(k,d){ try{ const v=localStorage.getItem('ime.'+k); return v?JSON.parse(v):d; }catch(e){ return d; } },
   set(k,v){ try{ localStorage.setItem('ime.'+k, JSON.stringify(v)); }catch(e){} }
@@ -379,8 +411,19 @@ const dueToday = t => t.freq==='daily' || (t.days||[]).includes(new Date().getDa
 
 /* ---------- voice and chime ---------- */
 function speak(text){
-  if(!SPEAK||!('speechSynthesis' in window)) return;
-  try{ speechSynthesis.cancel(); const u=new SpeechSynthesisUtterance(text); u.rate=(CFG&&CFG.speechRate)||0.8; speechSynthesis.speak(u); }catch(e){}
+  if(!SPEAK || !('speechSynthesis' in window) || !text) return;
+  try{
+    speechSynthesis.cancel();
+    const u=new SpeechSynthesisUtterance(String(text));
+    u.rate=(CFG&&CFG.speechRate)||0.8;
+    u.volume=1; u.pitch=1; u.lang=navigator.language||'en-US';
+    const vs=speechSynthesis.getVoices();
+    const v=vs.find(x=>x.lang && x.lang.startsWith((navigator.language||'en').slice(0,2)));
+    if(v) u.voice=v;
+    // Chrome sometimes parks the queue; a resume nudges it awake
+    speechSynthesis.resume();
+    speechSynthesis.speak(u);
+  }catch(e){}
 }
 let AC;
 function chime(pattern){
@@ -547,7 +590,7 @@ function cardHTML(t,due,i,finished){
   const dress = t.outfit && !finished;
   const stepped = (t.steps||[]).length > 0 && !finished;
   return `<div class="card ${finished?'is-done':''} ${due&&!finished?'is-due':''}" style="animation-delay:${i*45}ms">
-    <div class="pic">${t.photo?`<img src="${t.photo}" alt="">`:t.icon}</div>
+    <div class="pic">${t.photo?`<img src="${t.photo}" alt="">`:icoHTML(t.icon)}</div>
     <div class="cbody">
       <div class="cname">${esc(t.name)}</div>
       <div class="cwhen">${carriedOver(t)?'Still to do · ':t.freq==='weekly'?'This week · ':''}${effTime(t)!==mins(t.time)?'when you get home':pretty(t.time)}${t.timer?' · '+Math.round(t.timer/60)+' min':''}</div>
@@ -724,7 +767,7 @@ function drawStep(){
   if(!st) return finishSteps();
   document.getElementById('steps').innerHTML=`
     <div class="dots">${list.map((_,i)=>`<div class="dot ${i===stepIx?'on':i<stepIx?'past':''}"></div>`).join('')}</div>
-    <div class="spic">${st.photo?`<img src="${st.photo}" alt="">`:st.icon}</div>
+    <div class="spic">${st.photo?`<img src="${st.photo}" alt="">`:icoHTML(st.icon)}</div>
     <div class="slabel">${esc(st.label)}</div>
     <div class="scount">${stepIx+1} of ${list.length}</div>
     <div class="sbtns">
@@ -749,7 +792,7 @@ function finishSteps(){
   if(t.preview){
     // Water and tablets don't mix. She's seen the steps; now it stays put.
     document.getElementById('steps').innerHTML=`
-      <div class="spic" style="margin-top:8vh">${t.photo?`<img src="${t.photo}" alt="">`:t.icon}</div>
+      <div class="spic" style="margin-top:8vh">${t.photo?`<img src="${t.photo}" alt="">`:icoHTML(t.icon)}</div>
       <div class="slabel">Leave the tablet here</div>
       <div class="scount" style="font-size:21px;max-width:520px;text-align:center;margin-top:10px">
         Go and ${esc(t.name.toLowerCase())}. Come back and press the green button when you are finished.</div>
@@ -877,7 +920,12 @@ async function startCall(room, side, toName){
   callUI(side==='a'?'Calling…':'Connecting…');
   try{
     localStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:true});
-  }catch(e){ speak('I could not open the camera.'); endCall(); return; }
+  }catch(e){
+    endCall();
+    alert('Could not open the camera or microphone.\n\n'+e.name+': '+e.message+
+      '\n\nOn the tablet: Chrome settings, Site settings, Camera and Microphone, allow this site.');
+    return;
+  }
   document.getElementById('vNear').srcObject=localStream;
 
   pc=new RTCPeerConnection(iceConfig());
@@ -1057,7 +1105,7 @@ function drawOutfit(){
     if(!items.length) return;
     html += `<div class="olayer"><h3>${label}</h3><div class="orow">`+
       items.map(i=>`<button class="oitem" data-wear="${i.id}" aria-pressed="${picked_[key]===i.id}">
-        <div class="pic">${i.photo?`<img src="${i.photo}" alt="">`:i.icon}</div>
+        <div class="pic">${i.photo?`<img src="${i.photo}" alt="">`:icoHTML(i.icon)}</div>
         <b>${esc(i.name)}</b>
         <div class="chk">${picked_[key]===i.id?'✓':''}</div></button>`).join('')+`</div></div>`;
   });
@@ -1190,7 +1238,7 @@ async function openAlarm(t){
   const el = document.getElementById('alarm');
 
   el.innerHTML = `
-    <div class="apic">${t.photo?`<img src="${t.photo}" alt="">`:t.icon}</div>
+    <div class="apic">${t.photo?`<img src="${t.photo}" alt="">`:icoHTML(t.icon)}</div>
     <h2>Time to</h2>
     <div class="aname">${esc(t.name)}</div>
     <div class="asub">${pretty(t.time)}</div>
@@ -1271,7 +1319,7 @@ function alarmHelp(){
     <div class="aname" style="font-size:38px;margin-bottom:26px">${esc(t.name)}</div>
     <div class="grid2" style="max-width:640px;width:100%">
       ${people.map(c=>`<button class="person" data-ask="${c.id}">
-        <div class="pic">${c.photo?`<img src="${c.photo}" alt="">`:c.icon}</div><b>${esc(c.name)}</b></button>`).join('')}
+        <div class="pic">${c.photo?`<img src="${c.photo}" alt="">`:icoHTML(c.icon)}</div><b>${esc(c.name)}</b></button>`).join('')}
     </div>
     <div class="abtns"><button class="alater" id="aBack">Go back</button></div>`;
   clearInterval(alarmTimer); alarmTimer=null;
@@ -1339,7 +1387,7 @@ function renderMsg(){
     let html='';
     if(unread.length) html += `<div class="group-label">📩 New for you</div>`+unread.map(bubbleHTML).join('');
     html += `<div class="group-label">Say something</div><div class="grid2">`+contacts.map(c=>
-      `<button class="person" data-contact="${c.id}"><div class="pic">${c.photo?`<img src="${c.photo}" alt="">`:c.icon}</div><b>${esc(c.name)}</b></button>`
+      `<button class="person" data-contact="${c.id}"><div class="pic">${c.photo?`<img src="${c.photo}" alt="">`:icoHTML(c.icon)}</div><b>${esc(c.name)}</b></button>`
     ).join('')+`</div>`;
     const recent = MSGS.filter(m=>!(m.dir==='in'&&m.id>lastSeen)).slice(-8).reverse();
     if(recent.length) html += `<div class="group-label">Earlier</div>`+recent.map(bubbleHTML).join('');
@@ -1446,6 +1494,29 @@ document.addEventListener('click', e=>{
   if(t.id==='setupClose'){ document.getElementById('setup').classList.add('hide'); return; }
   if(t.id==='tSpeak'){ SPEAK=!SPEAK; LS.set('speak',SPEAK); t.setAttribute('aria-pressed',SPEAK); return; }
   if(t.id==='tSound'){ SOUND=!SOUND; LS.set('sound',SOUND); t.setAttribute('aria-pressed',SOUND); if(SOUND) chime(); return; }
+  const rt=t.closest('[data-rate]');
+  if(rt){
+    LS.set('rate',parseFloat(rt.dataset.rate));
+    if(CFG){ CFG.speechRate=parseFloat(rt.dataset.rate); LS.set('config',CFG); }
+    document.querySelectorAll('[data-rate]').forEach(x=>x.setAttribute('aria-pressed',x===rt));
+    speak('This is how fast I will talk.');
+    return;
+  }
+  if(t.id==='testVoice'){
+    unlockAudio(); chime();
+    const st=document.getElementById('voiceState');
+    if(!('speechSynthesis' in window)){ st.textContent='This tablet has no speech built in.'; return; }
+    const n=speechSynthesis.getVoices().length;
+    st.textContent = n ? n+' voices available. If you heard nothing, check the tablet volume and that Google Text-to-speech is installed in Settings.' 
+                       : 'No voices found. Install Google Text-to-speech from the Play Store, then Settings, Accessibility, Text-to-speech output.';
+    speak('Hello Karelynn. This is how I will talk to you.');
+    return;
+  }
+  if(t.id==='installApp'){
+    if(installPrompt){ installPrompt.prompt(); installPrompt=null; }
+    else alert('Use the Chrome menu, then Add to Home screen. If that is missing, this page is already installed.');
+    return;
+  }
   if(t.id==='askNotif'){
     if('Notification' in window) Notification.requestPermission().then(p=>{
       t.textContent = p==='granted' ? '✓ Notifications are on' : 'Blocked in tablet settings';
@@ -1473,6 +1544,8 @@ document.addEventListener('click', e=>{
     document.getElementById('fApi').value=API;
     document.getElementById('tSpeak').setAttribute('aria-pressed',SPEAK);
     document.getElementById('tSound').setAttribute('aria-pressed',SOUND);
+    const r=(CFG&&CFG.speechRate)||LS.get('rate',0.8);
+    document.querySelectorAll('[data-rate]').forEach(x=>x.setAttribute('aria-pressed',parseFloat(x.dataset.rate)===r));
     document.getElementById('connState').textContent = online?'\u2713 Connected':'Not connected';
   };
 
@@ -1496,14 +1569,45 @@ document.addEventListener('click', e=>{
   });
 })();
 
-(function(){
-  const m={name:'IndependentME',short_name:'IndependentME',display:'standalone',
-    background_color:'#F4C77E',theme_color:'#F4C77E',start_url:'.',
-    icons:[{src:'data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="110" fill="#F4C77E"/><path d="M140 268l70 70 165-165" fill="none" stroke="#22201C" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/></svg>'),sizes:'512x512',type:'image/svg+xml'}]};
-  const l=document.createElement('link'); l.rel='manifest';
-  l.href=URL.createObjectURL(new Blob([JSON.stringify(m)],{type:'application/json'}));
-  document.head.appendChild(l);
-})();
+/* Service worker: makes the app installable and keeps it opening offline. */
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+/* Android only offers "install" once; catch it and keep it for the setup panel. */
+let installPrompt=null;
+window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; });
+
+/* ============================================================
+   Speech
+
+   Two things break text-to-speech on Android: voices aren't loaded
+   when the page opens, and the browser refuses to speak until the
+   user has touched the screen once. Both are handled here.
+   ============================================================ */
+let voiceReady=false, speechUnlocked=false;
+function primeVoices(){
+  if(!('speechSynthesis' in window)) return;
+  const v=speechSynthesis.getVoices();
+  if(v && v.length) voiceReady=true;
+}
+if('speechSynthesis' in window){
+  primeVoices();
+  speechSynthesis.onvoiceschanged=primeVoices;
+}
+function unlockAudio(){
+  if(speechUnlocked) return;
+  speechUnlocked=true;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended') AC.resume();
+  }catch(e){}
+  try{
+    const u=new SpeechSynthesisUtterance(' ');
+    u.volume=0; speechSynthesis.speak(u);
+  }catch(e){}
+}
+document.addEventListener('pointerdown', unlockAudio, {once:false});
 
 renderHome(); renderMsg(); updateBadge();
 sync(); loadWeather();
