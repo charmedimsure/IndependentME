@@ -103,7 +103,8 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 .bar{position:fixed;left:0;right:0;bottom:0;background:rgba(20,22,28,.94);backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:9px 12px calc(9px + env(safe-area-inset-bottom))}
 .bar-in{max-width:620px;margin:0 auto;display:flex}
 .tab{flex:1;padding:9px 4px;display:grid;place-items:center;gap:4px;font-size:11px;font-weight:800;color:var(--soft);position:relative}
-.tab em{font-style:normal;font-size:21px}
+.tab em{font-style:normal;font-size:20px}
+.tab{font-size:10.5px}
 .tab[aria-current="true"]{color:var(--amber)}
 .tab .bdg{position:absolute;top:2px;right:calc(50% - 24px);min-width:19px;height:19px;border-radius:10px;background:var(--miss);color:#fff;font-size:11px;display:grid;place-items:center;padding:0 5px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -116,6 +117,14 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 .installbar span{font-size:12.5px;font-weight:700;opacity:.75}
 .installbar .go{background:#22201C;color:var(--amber);border-radius:12px;padding:11px 16px;font-weight:800;font-size:14px;flex:none}
 .installbar .x{background:transparent;color:#22201C;font-size:20px;padding:6px 4px;opacity:.55;flex:none}
+
+.ring{position:fixed;inset:0;z-index:75;background:#14161C;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;padding:28px;text-align:center}
+.ring .who{font-family:'Bricolage Grotesque',sans-serif;font-size:38px;font-weight:800;color:#EDEFF5}
+.ring .sub{color:#8E95A8;font-weight:700}
+.ring .btns{display:flex;gap:16px;margin-top:14px}
+.ring .ans{background:#3ECF7C;color:#08210F;border-radius:40px;padding:20px 34px;font-weight:800;font-size:19px}
+.ring .dec{background:#E8604C;color:#fff;border-radius:40px;padding:20px 34px;font-weight:800;font-size:19px}
 </style>
 </head>
 <body>
@@ -132,6 +141,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
   <button class="tab" data-tab="today" aria-current="true"><em>◎</em>Today</button>
   <button class="tab" data-tab="week"><em>▦</em>Week</button>
   <button class="tab" data-tab="msgs"><em>💬</em>Messages<span class="bdg hide" id="bdg">0</span></button>
+  <button class="tab" data-tab="plan"><em>✎</em>Her plan</button>
   <button class="tab" data-tab="setup"><em>⚙</em>Setup</button>
 </div></nav>
 
@@ -162,6 +172,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
   <button class="x" id="ibNo">✕</button>
 </div>
 <div class="lightbox hide" id="lightbox"></div>
+<div class="ring hide" id="ring"></div>
 <div class="callwrap hide" id="callwrap"></div>
 <script>
 /* ============================================================
@@ -171,6 +182,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
    Used anywhere an icon value starts with "svg:".
    ============================================================ */
 const SVGI = {
+  can:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="10" width="24" height="44" rx="6"/><path d="M20 20h24M20 44h24"/><path d="M28 14h8"/></svg>',
   towel:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10h32a6 6 0 0 1 6 6v38a4 4 0 0 1-4 4H18a6 6 0 0 1-6-6V16a6 6 0 0 1 4-5.7z"/><path d="M16 10a6 6 0 0 0 0 12h8V10"/><path d="M22 32h20M22 40h20"/></svg>',
   sweater:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10h16l12 7-5 11-5-2.5V54H22V25.5L17 28l-5-11z"/><path d="M24 10c0 4.5 3.6 7 8 7s8-2.5 8-7"/><path d="M22 46h20"/></svg>',
   toothbrush:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 54 44 22"/><path d="M40 10l12 9-8 11-12-9z"/><path d="M18 50l-4 6 7-2z"/></svg>',
@@ -203,7 +215,10 @@ let API=LS.get('api',''), HOUSE=LS.get('house',''), CARE=LS.get('care',''), ME=L
 })();
 let CFG=LS.get('config',null), DONE=[], MSGS=[], WEEK=[], PHOTOS=[];
 let online=false, tab='today', lastCount=0;
+let HANDLED_CALLS=LS.get('handledCalls',{}), incoming=null;
 let savedAt=LS.get('savedAt',0), saving=false, TIDY=false;
+let loaded=false;   // true once we've actually seen the household's setup
+let secKey=null;    // which settings screen is open
 
 const DAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const D3=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -232,8 +247,16 @@ function effT(t){
 }
 const dueOn=(t,dow)=>t.freq==='daily'||(t.days||[]).includes(dow);
 
+let blankIds={};
 const blank=()=>({
-  name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8, keepDays:30,
+  name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8, keepDays:30, showWholeDay:false,
+  rewardOn:true, rewardNeed:0, weekNeedDays:7,
+  rewards:[
+    {id:uid(),name:'Orange Crush',  icon:'svg:can',photo:null,ok:true,tier:'day'},
+    {id:uid(),name:'Kit Kat',       icon:'🍫',photo:null,ok:true,tier:'day'},
+    {id:uid(),name:'Kinder egg',    icon:'🥚',photo:null,ok:true,tier:'day'},
+    {id:uid(),name:'Chipotle',      icon:'🌯',photo:null,ok:true,tier:'week'}
+  ],
   events:[
     {id:uid(),title:'Day service',icon:'🚐',photo:null,kind:'weekly',days:[2,3,4],from:'08:45',to:'15:00',warn:20,big:true,away:true,
      items:[{icon:'🎨',label:'activities'},{icon:'🍽️',label:'lunch there'}],note:'Home by three.'}
@@ -274,16 +297,31 @@ const blank=()=>({
     {id:uid(),name:'Laundry',rollover:true,icon:'🧺',photo:null,time:'11:00',freq:'weekly',days:[6]},
     {id:uid(),name:'Change sheets',rollover:true,icon:'🛏️',photo:null,time:'11:00',freq:'weekly',days:[6]}
   ],
-  contacts:[],
+  contacts:(()=>{
+    const mom=uid(), dad=uid(), nan=uid(), shel=uid();
+    blankIds={mom,dad,nan,shel};
+    return [
+      {id:mom, name:'Mom',   icon:'👩',photo:null,ntfy:'',busy:{days:[],from:'08:00',to:'17:00'},override:'auto',escalate:true, fallback:true, grace:null},
+      {id:dad, name:'Dad',   icon:'👨',photo:null,ntfy:'',busy:{days:[1,2,3,4,5],from:'06:00',to:'17:00'},override:'auto',escalate:true, fallback:false,grace:null},
+      {id:nan, name:'Nan',   icon:'👧',photo:null,ntfy:'',busy:{days:[1,2,3,4,5],from:'07:30',to:'15:30'},override:'auto',escalate:false,fallback:false,grace:2},
+      {id:shel,name:'Shelby',icon:'👩',photo:null,ntfy:'',busy:{days:[1,2,3,4,5],from:'08:00',to:'17:00'},override:'auto',escalate:true, fallback:false,grace:null}
+    ];
+  })(),
   phrases:[
-    {id:uid(),icon:'👋',text:'Hi! Thinking about you.'},
-    {id:uid(),icon:'🆘',text:'I need help please.'},
-    {id:uid(),icon:'✅',text:'I finished everything today!'},
-    {id:uid(),icon:'🍽️',text:"I'm hungry."},
-    {id:uid(),icon:'📞',text:'Can you call me?'},
-    {id:uid(),icon:'❤️',text:'I love you.'},
-    {id:uid(),icon:'😴',text:"I'm tired."},
-    {id:uid(),icon:'🤒',text:"I don't feel good."}
+    {id:uid(),icon:'🆘',text:'I need help please.',            kind:'need',for:[]},
+    {id:uid(),icon:'🍽️',text:"I'm hungry.",              kind:'need',for:[]},
+    {id:uid(),icon:'📞',text:'Can you call me?',               kind:'need',for:[]},
+    {id:uid(),icon:'😴',text:"I'm tired.",                     kind:'need',for:[]},
+    {id:uid(),icon:'🤒',text:"I don't feel good.",             kind:'need',for:[]},
+    {id:uid(),icon:'✅',text:'I finished everything today!',       kind:'need',for:[]},
+
+    {id:uid(),icon:'❤️',text:'I love you.',                  kind:'nice',for:[]},
+    {id:uid(),icon:'👋',text:'Hi! Thinking about you.',        kind:'nice',for:[]},
+    {id:uid(),icon:'🏆',text:"You're the best Dad.",           kind:'nice',for:[blankIds.dad]},
+    {id:uid(),icon:'🚗',text:"You're an excellent driver.",    kind:'nice',for:[]},
+    {id:uid(),icon:'💪',text:'Dad is the strongest.',          kind:'nice',for:[]},
+    {id:uid(),icon:'💕',text:"You're the best sister.",        kind:'nice',for:[blankIds.nan, blankIds.shel]},
+    {id:uid(),icon:'🍳',text:'Mom is excellent at making dinner.',kind:'nice',for:[]}
   ]
 });
 
@@ -297,6 +335,7 @@ async function post(path,body){
   if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
   return j;
 }
+
 async function pull(){
   if(!API||!HOUSE){ setConn(false); return; }
   try{
@@ -304,15 +343,37 @@ async function pull(){
     const r=await fetch(base+'/pull?house='+encodeURIComponent(HOUSE)+'&day='+key());
     if(!r.ok) throw 0;
     const d=await r.json();
+
+    if(d.config) loaded=true;
+    if(d.config && (d.config.contacts||[]).length) snapshot(d.config, d.updated);
     // Only adopt the server's copy if it's at least as new as our last save and
     // nothing is being edited. A refresh must never eat work in progress.
     if(d.config && !saving && !sub && (d.updated||0) >= savedAt){
       CFG=d.config; LS.set('config',CFG);
       savedAt=d.updated||savedAt; LS.set('savedAt',savedAt);
     }
-    DONE=d.done||[]; PHOTOS=d.photos||[]; 
+
+    DONE=d.done||[]; PHOTOS=d.photos||[];
     const prev=MSGS.filter(m=>m.dir==='out').length;
     MSGS=d.messages||[];
+
+    // Karelynn ringing us
+    const call=MSGS.filter(m=>m.dir==='call' && !HANDLED_CALLS[m.id] && Date.now()-m.at < 120000).pop();
+    if(call && !room && !incoming){
+      const [rm,from]=String(call.body).split('|');
+      incoming={id:call.id, room:rm, from:from||'Karelynn'};
+      document.getElementById('ring').innerHTML=
+        `<div style="font-size:64px">📹</div>
+         <div class="who">${esc(incoming.from)}</div>
+         <div class="sub">is calling you</div>
+         <div class="btns"><button class="dec" id="ringNo">Decline</button>
+         <button class="ans" id="ringYes">Answer</button></div>`;
+      document.getElementById('ring').classList.remove('hide');
+      if('Notification' in window && Notification.permission==='granted'){
+        try{ new Notification(incoming.from+' is calling',{body:'Open Care to answer',tag:'call'+call.id}); }catch(e){}
+      }
+    }
+
     const now=MSGS.filter(m=>m.dir==='out').length;
     if(now>prev && lastCount>0) ping();
     lastCount=now;
@@ -324,41 +385,51 @@ async function pull(){
   }catch(e){ setConn(false); }
   render();
 }
+
 function setConn(v){
   online=v;
   document.getElementById('conn').classList.toggle('on',v);
   document.getElementById('connTxt').textContent = v?'connected':(API?'offline':'not set up');
 }
+
 function ping(){
-  try{ new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
   if('Notification' in window && Notification.permission==='granted'){
     const m=MSGS.filter(x=>x.dir==='out').slice(-1)[0];
-    if(m) try{ new Notification('Message from '+(CFG&&CFG.name||'home'),{body:m.body,tag:'c'+m.id}); }catch(e){}
+    if(m) try{ new Notification('Message from '+((CFG&&CFG.name)||'home'),{body:m.body,tag:'c'+m.id}); }catch(e){}
   }
 }
 
 /* ---------- views ---------- */
 function render(){
+  /* Never redraw the screen out from under someone who is typing. The refresh
+     runs every fifteen seconds, which is exactly long enough to lose a
+     sentence halfway through. */
+  const a=document.activeElement;
+  const typing = a && (a.tagName==='TEXTAREA' || a.tagName==='INPUT' || a.isContentEditable);
+  if(typing){ pendingRender=true; return; }
+  pendingRender=false;
+
   document.getElementById('pageTitle').textContent =
-    {today:'Today',week:'This week',msgs:'Messages',setup:'Setup'}[tab];
+    {today:'Today',week:'This week',msgs:'Messages',plan:'Her plan',setup:'Setup'}[tab];
   const unread=MSGS.filter(m=>(m.dir==='out'||m.dir==='alert')&&!m.seen).length;
   const b=document.getElementById('bdg');
   b.textContent=unread; b.classList.toggle('hide',unread===0);
   document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-current',x.dataset.tab===tab));
-  ({today:viewToday,week:viewWeek,msgs:viewMsgs,setup:viewSetup}[tab])();
+  ({today:viewToday,week:viewWeek,msgs:viewMsgs,plan:viewPlan,setup:viewSetup}[tab])();
   if(tab==='msgs') loadShots();
 }
 
 function viewToday(){
   const el=document.getElementById('view');
-  if(!CFG){ el.innerHTML=`<div class="panel"><div class="empty">Not connected yet. Open Setup to add the worker address and household code.</div></div>`; return; }
+  if(!CFG){ el.innerHTML=`<div class="panel"><div class="empty">Not connected yet. Open Setup, then Advanced.</div></div>`; return; }
   const dow=new Date().getDay();
-  const list=(CFG.tasks||[]).filter(t=>dueOn(t,dow)).sort((a,b)=>effT(a)-effT(b));
+  const list=(CFG.tasks||[]).filter(t=>dueOn(t,dow)).sort((a,b)=>mins(a.time)-mins(b.time));
   const doneMap={}; DONE.forEach(d=>doneMap[d.id]=d.at);
   const nowM=new Date().getHours()*60+new Date().getMinutes();
   const n=list.filter(t=>doneMap[t.id]).length;
   const pct=list.length?n/list.length:0;
   const C=2*Math.PI*40;
+  const late=list.filter(t=>!doneMap[t.id]&&mins(t.time)<nowM-30).length;
 
   el.innerHTML=`
   <div class="panel"><div class="summary">
@@ -366,23 +437,22 @@ function viewToday(){
       <circle class="bg" cx="46" cy="46" r="40"/>
       <circle class="fg" cx="46" cy="46" r="40" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}"/>
     </svg><b>${n}/${list.length}</b></div>
-    <div class="txt"><b>${DAYS[dow]}${awayWin()?' · out '+pretty(((CFG.events||[]).find(e=>e.away)||{}).from||'')+'\u2013'+pretty(((CFG.events||[]).find(e=>e.away)||{}).to||''):''}</b>${
+    <div class="txt"><b>${DAYS[dow]}</b>${
       !list.length?'Nothing scheduled today.'
       : n===list.length?'Everything is done. Nice day.'
-      : (list.filter(t=>!doneMap[t.id]&&effT(t)<nowM-30).length
-          ? list.filter(t=>!doneMap[t.id]&&effT(t)<nowM-30).length+' past due, '+(list.length-n)+' left overall.'
-          : (list.length-n)+' still to go, nothing overdue.')}</div>
+      : late ? late+' past due, '+(list.length-n)+' left overall.'
+      : (list.length-n)+' still to go, nothing overdue.'}</div>
   </div></div>
 
   <div class="panel"><h3>The list</h3>${
     list.length? list.map(t=>{
       const at=doneMap[t.id];
-      const late=!at && effT(t)<nowM-30;
+      const isLate=!at && mins(t.time)<nowM-30;
       return `<div class="trow">
         <div class="tico">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
         <div class="tmain"><div class="tname">${esc(t.name)}</div>
-          <div class="tsub">${effT(t)!==mins(t.time)?'after she is home':pretty(t.time)}${t.freq==='weekly'?' · weekly':''}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
-        <div class="tstat ${at?'s-ok':late?'s-late':'s-wait'}">${at?'✓ '+clock(at):late?'past due':'waiting'}</div>
+          <div class="tsub">${pretty(t.time)}${t.freq==='weekly'?' · weekly':''}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
+        <div class="tstat ${at?'s-ok':isLate?'s-late':'s-wait'}">${at?'✓ '+clock(at):isLate?'past due':'waiting'}</div>
       </div>`;
     }).join('') : '<div class="empty">Nothing scheduled today.</div>'}
   </div>`;
@@ -438,10 +508,11 @@ function viewMsgs(){
 
     <div class="panel"><h3>Send a message</h3>
       <div class="quick">${quick.map(q=>`<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
-      <textarea id="reply" rows="2" placeholder="Type something to read out on the tablet"></textarea>
+      <textarea id="reply" rows="2" placeholder="Type something to read out on the tablet">${esc(draftReply)}</textarea>
       <button class="btn" style="margin-top:11px" id="sendBtn">Send to the tablet</button>
       <p class="note" style="margin-top:10px">It arrives on her screen with a chime and is read out loud, so it works whether or not she reads it.</p>
     </div>
+
     <div class="panel">
       <h3 style="display:flex;justify-content:space-between;align-items:center">History
         <button style="font-size:12px;letter-spacing:.06em;color:var(--amber)" id="tidyToggle">${TIDY?'Done':'Tidy up'}</button>
@@ -456,8 +527,8 @@ function viewMsgs(){
         m.dir==='alert'
         ? `<div class="msg from"><div class="av">${m.icon||'⏰'}</div><div>
              <div class="b ${m.seen?'':'unseen'}" style="background:${m.icon==='🆘'?'rgba(232,96,76,.16);color:var(--miss)':'rgba(242,179,61,.14);color:var(--warn)'}">${esc(m.body)}</div>
-             <div class="when">${m.who?'she asked '+esc(m.who):'everyone'} · ${clock(m.at)}${m.ack?' · '+esc(m.ack)+' has it':''}</div>
-             ${(m.icon==='🆘'&&!m.ack)?`<button class="btn" style="margin-top:8px;padding:10px 14px;font-size:14px;width:auto" data-ack="${m.id}">I've got this</button>`:''}
+             <div class="when">${m.icon==='🎁'?'earned':(m.who?'she asked '+esc(m.who):'everyone')} · ${clock(m.at)}${m.ack?' · '+esc(m.ack)+(m.icon==='🎁'?' gave it':' has it'):''}</div>
+             ${((m.icon==='🆘'||m.icon==='🎁')&&!m.ack)?`<button class="btn" style="margin-top:8px;padding:10px 14px;font-size:14px;width:auto" data-ack="${m.id}">${m.icon==='🎁'?'Given ✓':"I've got this"}</button>`:''}
              </div>${TIDY?`<button class="x" style="background:transparent;color:var(--miss);font-size:18px;padding:4px 8px" data-del="${m.id}">✕</button>`:''}</div>`
         : m.dir==='out'
         ? `<div class="msg from"><div class="av">${m.icon||'💬'}</div><div>
@@ -469,41 +540,102 @@ function viewMsgs(){
     </div>`;
 }
 
-/* ---------- setup ---------- */
-let sub=null;
-function viewSetup(){
-  const el=document.getElementById('view');
-  if(sub==='ward') return editWard();
-  if(sub==='event') return editEvent();
-  if(sub==='task') return editTask();
-  if(sub==='contact') return editContact();
-  if(sub==='phrase') return editPhrase();
-  if(sub==='ward') return editWard();
-  if(sub==='event') return editEvent();
-
-  el.innerHTML=`
-  <div class="panel"><h3>Connection</h3>
-    <label class="f">Worker address</label>
-    <input id="sApi" value="${esc(API)}" placeholder="https://independentme.workers.dev" autocapitalize="off" spellcheck="false">
-    <label class="f">Household code</label>
-    <input id="sHouse" value="${esc(HOUSE)}" placeholder="karelynn-home" autocapitalize="off" spellcheck="false">
-    <label class="f">Caregiver key</label>
-    <input id="sCare" value="${esc(CARE)}" placeholder="a long private phrase" autocapitalize="off" spellcheck="false">
-    <button class="btn" style="margin-top:16px" id="saveConn">Save and connect</button>
-    <p class="note" style="margin-top:10px">The tablet needs the worker address and household code. The caregiver key stays on your phone only, and is what lets this app change things.</p>
-  </div>
-
-  <div class="panel"><h3>Who you are on this device</h3>
-    <select id="sMe">
-      <option value="">— pick yourself —</option>
-      ${(CFG&&CFG.contacts||[]).map(c=>`<option value="${esc(c.name)}" ${ME===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
+function secBody(){
+  switch(secKey){
+    case 'day': return `<div class="panel"><h3>Things to do</h3>
+    ${(CFG&&CFG.tasks||[]).slice().sort((a,b)=>mins(a.time)-mins(b.time)).map(t=>`
+      <div class="trow"><div class="tico">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
+      <div class="tmain"><div class="tname">${esc(t.name)}</div>
+        <div class="tsub">${t.freq==='daily'?'Every day':(t.days||[]).map(d=>D3[d]).join(', ')||'no days set'} · ${pretty(t.time)}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
+      <button class="tstat s-wait" data-etask="${t.id}">edit</button></div>`).join('')
+      || '<div class="empty">No tasks yet.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-etask="new">+ Add a task</button>
+  </div>`;
+    case 'plan': return `<div class="panel"><h3>What's happening</h3>
+    ${(CFG&&CFG.events||[]).map(e=>`
+      <div class="trow"><div class="tico">${e.photo?`<img src="${e.photo}">`:e.icon}</div>
+      <div class="tmain"><div class="tname">${esc(e.title)}</div>
+        <div class="tsub">${e.kind==='date'?e.date:(e.days||[]).map(d=>D3[d]).join(', ')}${e.from?' · '+pretty(e.from):''}</div></div>
+      <button class="tstat s-wait" data-eev="${e.id}">edit</button></div>`).join('')
+      || '<div class="empty">Nothing on the calendar.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-eev="new">+ Add something</button>
+    <p class="note" style="margin-top:12px">Shown on her screen as pictures she can tap to hear. Day service is already set for Tuesday, Wednesday and Thursday — add the day's activities to it, or add one-off entries for appointments and visitors.</p>
+  </div>`;
+    case 'say': return `<div class="panel"><h3>Things she can say</h3>
+    ${(CFG&&CFG.phrases||[]).map(p=>`
+      <div class="trow"><div class="tico">${p.icon}</div>
+      <div class="tmain"><div class="tname">${esc(p.text)}</div>
+        <div class="tsub">${p.kind==='nice'?'something nice':'something she needs'}${(p.for||[]).length?' · '+(p.for||[]).map(id=>((CFG.contacts||[]).find(c=>c.id===id)||{}).name).filter(Boolean).join(', '):''}</div></div>
+      <button class="tstat s-wait" data-ephr="${p.id}">edit</button></div>`).join('')
+      || '<div class="empty">No phrases yet.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-ephr="new">+ Add a phrase</button>
+  </div>`;
+    case 'rewards': return `<div class="panel"><h3>Working toward something</h3>
+    <div class="row"><button class="chip" id="sRewOn" aria-pressed="${!!(CFG&&CFG.rewardOn)}">${(CFG&&CFG.rewardOn)?'On':'Off'}</button></div>
+    <label class="f">How many things she has to finish</label>
+    <select id="sRewNeed">
+      <option value="0" ${!(CFG&&CFG.rewardNeed)?'selected':''}>Everything on the list</option>
+      ${[2,3,4,5,6].map(n=>`<option value="${n}" ${(CFG&&CFG.rewardNeed)===n?'selected':''}>${n} of them</option>`).join('')}
     </select>
-    <button class="btn" style="margin-top:14px" id="saveMe">Save</button>
-    <p class="note" style="margin-top:10px">This is the name on your replies. Everyone shares one caregiver key, so this is a name tag rather than a login — fine among the four of you, worth knowing anyway.</p>
-    ${ME?`<button class="btn ghost" style="margin-top:12px" id="invite">Copy an invite link for someone else</button>`:''}
-  </div>
+    <p class="note" style="margin-top:8px">Setting a number below the full list is usually kinder — a hard morning can still end well. She chooses her reward at the start of the day and watches the circles fill.</p>
+    <button class="btn" style="margin-top:14px" id="saveRew">Save</button>
 
-  <div class="panel"><h3>Her name</h3>
+    <label class="f">The weekly one</label>
+    <select id="sWeekNeed">
+      ${[4,5,6,7].map(n=>`<option value="${n}" ${((CFG&&CFG.weekNeedDays)||7)===n?'selected':''}>${n===7?'Every day of the week':n+' good days out of 7'}</option>`).join('')}
+    </select>
+    <p class="note" style="margin-top:8px">A good day means everything on that day's list got done. At seven, one off day ends the week with four days still to go — five or six keeps it alive.</p>
+
+    <label class="f">What she can choose from</label>
+    ${(CFG&&CFG.rewards||[]).map(r=>`
+      <div class="trow"><div class="tico">${r.photo?`<img src="${r.photo}">`:icoHTML(r.icon)}</div>
+      <div class="tmain"><div class="tname">${esc(r.name)}</div>
+        <div class="tsub">${(r.tier||'day')==='week'?'weekly':'daily'} · ${r.ok===false?'not available today':'available'}</div></div>
+      <button class="tstat ${r.ok===false?'s-late':'s-ok'}" data-rok="${r.id}">${r.ok===false?'off':'on'}</button>
+      <button class="tstat s-wait" data-erew="${r.id}">edit</button></div>`).join('')
+      || '<div class="empty">Nothing to choose from yet.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-erew="new">+ Add a reward</button>
+    <p class="note" style="margin-top:12px">Only put things here you can actually deliver that day. An earned reward that doesn't arrive does more harm than not offering one.</p>
+  </div>`;
+    case 'clothes': return `<div class="panel"><h3>Her clothes</h3>
+    ${(CFG&&CFG.wardrobe||[]).map(w=>`
+      <div class="trow"><div class="tico">${w.photo?`<img src="${w.photo}">`:icoHTML(w.icon)}</div>
+      <div class="tmain"><div class="tname">${esc(w.name)}</div>
+        <div class="tsub">${({outer:'Coat',top:'Shirt',bottom:'Pants',feet:'Shoes',extra:'Also'})[w.layer]||w.layer} · ${w.minF}°–${w.maxF}°${w.rain?' · rain':''}</div></div>
+      <button class="tstat s-wait" data-eward="${w.id}">edit</button></div>`).join('')
+      || '<div class="empty">Nothing here yet.</div>'}
+    <button class="btn ghost" style="margin-top:14px" data-eward="new">+ Add a kind of clothing</button>
+    <p class="note" style="margin-top:12px">These are kinds of clothing, not specific garments, so laundry day can't make the app wrong. Adjust the temperatures to suit her — if she runs cold, push the coat up to 55.</p>
+  </div><div class="panel"><h3>Weather</h3>
+    <label class="f">Where she is</label>
+    <input id="sPlace" value="${esc((CFG&&CFG.place)||'')}" placeholder="Lancaster, Ohio">
+    <div class="row" style="margin-top:10px">
+      <input id="sLat" value="${(CFG&&CFG.lat)!=null?CFG.lat:''}" placeholder="latitude" inputmode="decimal">
+      <input id="sLon" value="${(CFG&&CFG.lon)!=null?CFG.lon:''}" placeholder="longitude" inputmode="decimal">
+    </div>
+    <button class="btn" style="margin-top:14px" id="saveWx">Save</button>
+    <p class="note" style="margin-top:10px">Forecast comes from Open-Meteo, free and no account needed. She's only warned about the forecast when it would change what she wears — rain coming, or a big temperature swing.</p>
+  </div>`;
+    case 'gentle': return `<div class="panel"><h3>How firm the reminders are</h3>
+    <label class="f">"Not yet" pushes it back by</label>
+    <select id="sSnooze">${[5,10,15,20,30].map(n=>`<option value="${n}" ${((CFG&&CFG.snoozeMinutes)||10)===n?'selected':''}>${n} minutes</option>`).join('')}</select>
+    <label class="f">She can put it off this many times</label>
+    <select id="sMax">${[0,1,2,3,5].map(n=>`<option value="${n}" ${((CFG&&CFG.maxSnoozes)!=null?CFG.maxSnoozes:3)===n?'selected':''}>${n===0?'Never — no Not yet button':n+' time'+(n>1?'s':'')}</option>`).join('')}</select>
+    <label class="f">If nobody answers "I need help", open it to everyone after</label>
+    <select id="sFallback">${[0,5,10,15,30].map(n=>`<option value="${n}" ${((CFG&&CFG.helpFallbackMinutes)!=null?CFG.helpFallbackMinutes:10)===n?'selected':''}>${n===0?'Never — only the person she asked':n+' minutes'}</option>`).join('')}</select>
+    <label class="f">Who hears about a task being put off</label>
+    <select id="sNudge">
+      <option value="primary" ${((CFG&&CFG.nudgeTo)||'primary')==='primary'?'selected':''}>Only the always-shown people</option>
+      <option value="all" ${(CFG&&CFG.nudgeTo)==='all'?'selected':''}>Everyone</option>
+    </select>
+    <p class="note" style="margin-top:8px">Help requests always go to the person she asked. This is only about the quiet heads-up when something's been postponed twice.</p>
+    <button class="btn" style="margin-top:16px" id="saveRules">Save</button>
+    <p class="note" style="margin-top:10px">After the last one, "Not yet" is replaced with "I need help", which messages you. The alarm never gets louder or scolds her; it hands her to a person instead.</p>
+  </div><div class="panel"><h3>What she sees</h3>
+    <div class="row"><button class="chip" id="sWhole" aria-pressed="${!!(CFG&&CFG.showWholeDay)}">${(CFG&&CFG.showWholeDay)?'The whole day at once':'Only what it is time for'}</button></div>
+    <p class="note" style="margin-top:10px">By default a task appears when its time arrives, not before. The arc across the top of her screen still shows the whole day as dots, so she can see what is coming without being handed a button she should not press yet.</p>
+    <button class="btn" style="margin-top:14px" id="saveWhole">Save</button>
+  </div><div class="panel"><h3>Her name</h3>
     <input id="sName" value="${esc((CFG&&CFG.name)||'')}" placeholder="Karelynn">
     <label class="f">How fast she's spoken to</label>
     <select id="sRate">${[[0.6,'Very slow'],[0.7,'Slow'],[0.8,'Steady'],[0.9,'Normal']].map(([v,l])=>`<option value="${v}" ${((CFG&&CFG.speechRate)||0.8)===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -520,69 +652,8 @@ function viewSetup(){
     <input id="sNtfy" value="${esc((CFG&&CFG.ntfy)||'')}" placeholder="karelynn-msgs-9x4f" autocapitalize="off" spellcheck="false">
     <p class="note" style="margin-top:8px">Install the free ntfy app, subscribe to this exact topic, and her messages buzz your phone even when this app is closed. Leave blank to skip.</p>
     <button class="btn" style="margin-top:14px" id="saveName">Save</button>
-  </div>
-
-  <div class="panel"><h3>How firm the reminders are</h3>
-    <label class="f">"Not yet" pushes it back by</label>
-    <select id="sSnooze">${[5,10,15,20,30].map(n=>`<option value="${n}" ${((CFG&&CFG.snoozeMinutes)||10)===n?'selected':''}>${n} minutes</option>`).join('')}</select>
-    <label class="f">She can put it off this many times</label>
-    <select id="sMax">${[0,1,2,3,5].map(n=>`<option value="${n}" ${((CFG&&CFG.maxSnoozes)!=null?CFG.maxSnoozes:3)===n?'selected':''}>${n===0?'Never — no Not yet button':n+' time'+(n>1?'s':'')}</option>`).join('')}</select>
-    <label class="f">If nobody answers "I need help", open it to everyone after</label>
-    <select id="sFallback">${[0,5,10,15,30].map(n=>`<option value="${n}" ${((CFG&&CFG.helpFallbackMinutes)!=null?CFG.helpFallbackMinutes:10)===n?'selected':''}>${n===0?'Never — only the person she asked':n+' minutes'}</option>`).join('')}</select>
-    <label class="f">Who hears about a task being put off</label>
-    <select id="sNudge">
-      <option value="primary" ${((CFG&&CFG.nudgeTo)||'primary')==='primary'?'selected':''}>Only the always-shown people</option>
-      <option value="all" ${(CFG&&CFG.nudgeTo)==='all'?'selected':''}>Everyone</option>
-    </select>
-    <p class="note" style="margin-top:8px">Help requests always go to the person she asked. This is only about the quiet heads-up when something's been postponed twice.</p>
-    <button class="btn" style="margin-top:16px" id="saveRules">Save</button>
-    <p class="note" style="margin-top:10px">After the last one, "Not yet" is replaced with "I need help", which messages you. The alarm never gets louder or scolds her; it hands her to a person instead.</p>
-  </div>
-
-  <div class="panel"><h3>Things to do</h3>
-    ${(CFG&&CFG.tasks||[]).slice().sort((a,b)=>mins(a.time)-mins(b.time)).map(t=>`
-      <div class="trow"><div class="tico">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
-      <div class="tmain"><div class="tname">${esc(t.name)}</div>
-        <div class="tsub">${t.freq==='daily'?'Every day':(t.days||[]).map(d=>D3[d]).join(', ')||'no days set'} · ${pretty(t.time)}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
-      <button class="tstat s-wait" data-etask="${t.id}">edit</button></div>`).join('')
-      || '<div class="empty">No tasks yet.</div>'}
-    <button class="btn ghost" style="margin-top:14px" data-etask="new">+ Add a task</button>
-  </div>
-
-  <div class="panel"><h3>What's happening</h3>
-    ${(CFG&&CFG.events||[]).map(e=>`
-      <div class="trow"><div class="tico">${e.photo?`<img src="${e.photo}">`:e.icon}</div>
-      <div class="tmain"><div class="tname">${esc(e.title)}</div>
-        <div class="tsub">${e.kind==='date'?e.date:(e.days||[]).map(d=>D3[d]).join(', ')}${e.from?' · '+pretty(e.from):''}</div></div>
-      <button class="tstat s-wait" data-eev="${e.id}">edit</button></div>`).join('')
-      || '<div class="empty">Nothing on the calendar.</div>'}
-    <button class="btn ghost" style="margin-top:14px" data-eev="new">+ Add something</button>
-    <p class="note" style="margin-top:12px">Shown on her screen as pictures she can tap to hear. Day service is already set for Tuesday, Wednesday and Thursday — add the day's activities to it, or add one-off entries for appointments and visitors.</p>
-  </div>
-
-  <div class="panel"><h3>Weather</h3>
-    <label class="f">Where she is</label>
-    <input id="sPlace" value="${esc((CFG&&CFG.place)||'')}" placeholder="Lancaster, Ohio">
-    <div class="row" style="margin-top:10px">
-      <input id="sLat" value="${(CFG&&CFG.lat)!=null?CFG.lat:''}" placeholder="latitude" inputmode="decimal">
-      <input id="sLon" value="${(CFG&&CFG.lon)!=null?CFG.lon:''}" placeholder="longitude" inputmode="decimal">
-    </div>
-    <button class="btn" style="margin-top:14px" id="saveWx">Save</button>
-    <p class="note" style="margin-top:10px">Forecast comes from Open-Meteo, free and no account needed. She's only warned about the forecast when it would change what she wears — rain coming, or a big temperature swing.</p>
-  </div>
-
-  <div class="panel"><h3>Her clothes</h3>
-    ${(CFG&&CFG.wardrobe||[]).map(w=>`
-      <div class="trow"><div class="tico">${w.photo?`<img src="${w.photo}">`:icoHTML(w.icon)}</div>
-      <div class="tmain"><div class="tname">${esc(w.name)}</div>
-        <div class="tsub">${({outer:'Coat',top:'Shirt',bottom:'Pants',feet:'Shoes',extra:'Also'})[w.layer]||w.layer} · ${w.minF}°–${w.maxF}°${w.rain?' · rain':''}</div></div>
-      <button class="tstat s-wait" data-eward="${w.id}">edit</button></div>`).join('')
-      || '<div class="empty">Nothing here yet.</div>'}
-    <button class="btn ghost" style="margin-top:14px" data-eward="new">+ Add a kind of clothing</button>
-    <p class="note" style="margin-top:12px">These are kinds of clothing, not specific garments, so laundry day can't make the app wrong. Adjust the temperatures to suit her — if she runs cold, push the coat up to 55.</p>
-  </div>
-
-  <div class="panel"><h3>People she can message</h3>
+  </div>`;
+    case 'people': return `<div class="panel"><h3>People she can message</h3>
     ${(CFG&&CFG.contacts||[]).length && !(CFG.contacts||[]).some(c=>c.fallback)
       ? `<div style="background:rgba(242,179,61,.14);color:var(--warn);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13.5px;font-weight:700;line-height:1.5">
            Nobody is marked <b>always shown</b>. During everyone's busy hours she'd be offered whoever is left, which may not be who you'd want. Open your own entry and turn it on.</div>`
@@ -596,23 +667,99 @@ function viewSetup(){
       <button class="tstat s-wait" data-econ="${c.id}">edit</button></div>`).join('')
       || '<div class="empty">No people yet. Add at least one so the Messages tab works on her tablet.</div>'}
     <button class="btn ghost" style="margin-top:14px" data-econ="new">+ Add a person</button>
-  </div>
-
-  <div class="panel"><h3>Things she can say</h3>
-    ${(CFG&&CFG.phrases||[]).map(p=>`
-      <div class="trow"><div class="tico">${p.icon}</div>
-      <div class="tmain"><div class="tname">${esc(p.text)}</div></div>
-      <button class="tstat s-wait" data-ephr="${p.id}">edit</button></div>`).join('')
-      || '<div class="empty">No phrases yet.</div>'}
-    <button class="btn ghost" style="margin-top:14px" data-ephr="new">+ Add a phrase</button>
-  </div>
-
-  <div class="panel"><h3>This phone</h3>
+  </div>`;
+    case 'phone': return `<div class="panel"><h3>Who you are on this device</h3>
+    <select id="sMe">
+      <option value="">— pick yourself —</option>
+      ${(CFG&&CFG.contacts||[]).map(c=>`<option value="${esc(c.name)}" ${ME===c.name?'selected':''}>${esc(c.name)}</option>`).join('')}
+    </select>
+    <button class="btn" style="margin-top:14px" id="saveMe">Save</button>
+    <p class="note" style="margin-top:10px">This is the name on your replies. Everyone shares one caregiver key, so this is a name tag rather than a login — fine among the four of you, worth knowing anyway.</p>
+    
+  </div><div class="panel"><h3>This phone</h3>
     <button class="btn ghost" id="askNotif">Turn on notifications</button>
+    <button class="btn ghost" style="margin-top:10px" id="testPush">Send a test notification to everyone</button>
+    <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-21-f</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-21-n</p>
   </div>`;
+    case 'advanced': return `<div class="panel"><h3>Connection</h3>
+    <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
+    <label class="f">Worker address</label>
+    <input id="sApi" value="${esc(API)}" placeholder="https://independentme.workers.dev" autocapitalize="off" spellcheck="false">
+    <label class="f">Household code</label>
+    <input id="sHouse" value="${esc(HOUSE)}" placeholder="karelynn-home" autocapitalize="off" spellcheck="false">
+    <label class="f">Caregiver key</label>
+    <input id="sCare" value="${esc(CARE)}" placeholder="a long private phrase" autocapitalize="off" spellcheck="false">
+    <button class="btn" style="margin-top:16px" id="saveConn">Save and connect</button>
+    <p class="note" style="margin-top:10px">The tablet needs the worker address and household code. The caregiver key stays on your phone only, and is what lets this app change things.</p>
+  </div><div class="panel"><h3>If something got lost</h3>
+    <button class="btn ghost" id="whoBack">Find people from the message history</button>
+    <p class="note" id="whoOut" style="margin-top:10px"></p>
+
+    <label class="f">Saved copies on this phone</label>
+    ${(LS.get('snaps',[])||[]).length
+      ? (LS.get('snaps',[])||[]).map((sn,i)=>`<div class="trow">
+          <div class="tmain"><div class="tname">${new Date(sn.at).toLocaleString()}</div>
+          <div class="tsub">${sn.people} people · ${sn.tasks} tasks</div></div>
+          <button class="tstat s-ok" data-snap="${i}">use</button></div>`).join('')
+      : '<p class="note">None yet. One is kept automatically each time the setup changes.</p>'}
+
+    <label class="f">Backup file</label>
+    <div class="row">
+      <button class="btn ghost" id="expCfg">Save a backup</button>
+      <button class="btn ghost" id="impCfg">Load a backup</button>
+    </div>
+    <input type="file" accept="application/json" id="impFile" style="display:none">
+    <p class="note" style="margin-top:10px">Worth doing once you have it set up the way you want it. The file goes to your phone's downloads and doesn't depend on any of this working.</p>
+
+    <label class="f">On the server</label>
+    <button class="btn ghost" id="prevPeek">What was here before?</button>
+    <p class="note" id="prevOut" style="margin-top:10px"></p>
+    <button class="btn" style="margin-top:12px;background:var(--warn);color:#fff" id="doRestore">Put the previous setup back</button>
+    <p class="note" style="margin-top:10px">Every save keeps a copy of what it replaced. This swaps them, so it also undoes itself if you press it twice.</p>
+    <button class="btn ghost" style="margin-top:14px" id="pushLocal">Upload this phone's copy instead</button>
+    <p class="note" style="margin-top:10px">Use this if your phone still shows the right setup but the server does not.</p>
+  </div>`;
+    default: return '';
+  }
+}
+
+function sectionShell(title, menuHTML){
+  const el=document.getElementById('view');
+  if(!secKey){ el.innerHTML = menuHTML; return; }
+  const TITLES={day:'Things she does', plan:'What’s happening', say:'Things she can say', rewards:'Rewards', clothes:'Clothes and weather', gentle:'Reminders and voice', people:'People', phone:'This phone', advanced:'Advanced'};
+  el.innerHTML = `<button class="btn ghost" style="margin-bottom:16px;width:auto;padding:11px 16px" id="secBack">‹ &nbsp;${title}</button>
+    <h2 style="font-family:'Bricolage Grotesque',sans-serif;font-size:23px;margin:0 0 16px">${TITLES[secKey]||''}</h2>
+    ${secBody()}`;
+}
+
+function anyEditorOpen(){
+  if(sub==='task'){ editTask(); return true; }
+  if(sub==='contact'){ editContact(); return true; }
+  if(sub==='phrase'){ editPhrase(); return true; }
+  if(sub==='ward'){ editWard(); return true; }
+  if(sub==='event'){ editEvent(); return true; }
+  if(sub==='reward'){ editReward(); return true; }
+  return false;
+}
+
+/* Her plan: the things that get adjusted week to week. */
+function viewPlan(){
+  if(anyEditorOpen()) return;
+  sectionShell('Her plan', `<button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="day"><div style="font-size:26px;width:34px;flex:none">✓</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Things she does</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Tasks, times, steps, timers</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="plan"><div style="font-size:26px;width:34px;flex:none">📅</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">What’s happening</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Day service, appointments, visitors</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="say"><div style="font-size:26px;width:34px;flex:none">💬</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Things she can say</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">The picture messages</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="rewards"><div style="font-size:26px;width:34px;flex:none">🎁</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Rewards</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">What she works toward, and what’s in stock</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="clothes"><div style="font-size:26px;width:34px;flex:none">👕</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Clothes and weather</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">What to wear, and where you are</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="gentle"><div style="font-size:26px;width:34px;flex:none">🔔</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Reminders and voice</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">How firm, how fast, what she sees</div></div><div style="color:var(--soft);font-size:20px">›</div></button>`);
+}
+
+/* Setup: joining this phone to the household, and the wiring behind it.
+   Touched once, then left alone. */
+function viewSetup(){
+  if(anyEditorOpen()) return;
+  const fresh = !ME;
+  sectionShell('Setup', (fresh ? `<div class="panel" style="background:var(--amber);color:#22201C">
+      <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:19px">Start here</div>
+      <div style="font-size:13.5px;font-weight:600;margin-top:4px;line-height:1.5">Open <b>This phone</b> and say which of you this is. Everything else is already done.</div>
+    </div>` : '') + `<button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="people"><div style="font-size:26px;width:34px;flex:none">👥</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">People</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Who she can reach, and when</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="phone"><div style="font-size:26px;width:34px;flex:none">📱</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">This phone</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Which of you this is, notifications, install</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="advanced"><div style="font-size:26px;width:34px;flex:none">⚙</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Advanced</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Connection, backups, recovery</div></div><div style="color:var(--soft);font-size:20px">›</div></button>`);
 }
 
 const TASK_ICONS=['svg:towel','svg:sweater','svg:toothbrush','svg:hairbrush','svg:soap','svg:shirt','🪥','💇','🚿','🛁','👕','🥣','🍎','💊','🧴','🧺','🛏️','💅','🚽','🧼','🧹','🗑️','👟','🎒','📺','🐕','☎️','💧','🌙','🧦','🪒','🧽','📅','🎵'];
@@ -737,6 +884,36 @@ function editContact(){
 }
 const WEAR_ICONS=['svg:sweater','svg:shirt','svg:towel','🧥','🧣','🧤','👕','👚','👔','🥼','👖','🩳','👗','🧦','👟','👢','🥾','🩴','🧢','☂️','🕶️','🎒'];
 const EV_ICONS=['🚐','🏫','🎨','🎳','🎬','🛒','🏊','🍽️','🎂','💈','🩺','🦷','🚗','🏡','👵','👨','🎵','⛪','🐕','📦'];
+const REW_ICONS=['svg:can','🎵','🎬','🧁','💅','🚶','🍦','🎨','📱','🛍️','🐕','🎮','📚','🏊','🍕','🚗','💃'];
+function editReward(){
+  const r=draft;
+  document.getElementById('view').innerHTML=`
+  <div class="panel"><h3>${r._new?'New reward':'Edit reward'}</h3>
+    <label class="f">What she calls it</label>
+    <input id="dName" value="${esc(r.name)}" placeholder="Music time">
+    <label class="f">Picture</label>
+    <div class="row" style="align-items:center">
+      <div class="tico" id="dPrev" style="width:64px;height:64px;font-size:32px">${r.photo?`<img src="${r.photo}">`:icoHTML(r.icon)}</div>
+      <div style="flex:1"><button class="btn ghost" id="dPhoto">Add a photo (optional)</button></div>
+    </div>
+    <input type="file" accept="image/*" id="dFile" style="display:none">
+    <div class="emojis" id="dIcons">${REW_ICONS.map(i=>`<button data-i="${i}" aria-pressed="${i===r.icon}">${icoHTML(i)}</button>`).join('')}</div>
+    <label class="f">Which goal</label>
+    <div class="row">
+      <button class="chip" data-tier="day" aria-pressed="${(r.tier||'day')==='day'}">Finishing a day</button>
+      <button class="chip" data-tier="week" aria-pressed="${r.tier==='week'}">Finishing a week</button>
+    </div>
+    <p class="note" style="margin-top:8px">She chooses which daily treat she's working for. The weekly one is whichever weekly reward is available, shown as its own row of seven.</p>
+
+    <label class="f">Available today</label>
+    <div class="row"><button class="chip" id="dROk" aria-pressed="${r.ok!==false}">${r.ok===false?'Not today':'Yes'}</button></div>
+    <p class="note" style="margin-top:8px">Switch it off when there are none in the house. She won't be offered it, so she can't work all day toward something that isn't there.</p>
+    <button class="btn" style="margin-top:18px" id="dSave">Save reward</button>
+    ${r._new?'':`<button class="btn bad" style="margin-top:9px" id="dDel">Delete</button>`}
+    <button class="btn ghost" style="margin-top:9px" id="dCancel">Cancel</button>
+  </div>`;
+}
+
 function editEvent(){
   const e=draft;
   document.getElementById('view').innerHTML=`
@@ -827,6 +1004,17 @@ function editPhrase(){
     <input id="dName" value="${esc(p.text)}" placeholder="I need help please.">
     <label class="f">Picture</label>
     <div class="emojis" id="dIcons">${SAY_ICONS.map(e=>`<button data-i="${e}" aria-pressed="${e===p.icon}">${e}</button>`).join('')}</div>
+    <label class="f">Which group</label>
+    <div class="row">
+      <button class="chip" data-kind="need" aria-pressed="${(p.kind||'need')==='need'}">Something I need</button>
+      <button class="chip" data-kind="nice" aria-pressed="${p.kind==='nice'}">Something nice</button>
+    </div>
+    <label class="f">Who it's for</label>
+    <div class="row" style="flex-wrap:wrap">
+      <button class="chip" data-for="" aria-pressed="${!(p.for||[]).length}">Anyone</button>
+      ${(CFG&&CFG.contacts||[]).map(c=>`<button class="chip" data-for="${c.id}" aria-pressed="${(p.for||[]).includes(c.id)}">${esc(c.name)}</button>`).join('')}
+    </div>
+    <p class="note" style="margin-top:8px">Keeps "You're the best Dad" from turning up when she's messaging her sister.</p>
     <button class="btn" style="margin-top:18px" id="dSave">Save phrase</button>
     ${p._new?'':`<button class="btn bad" style="margin-top:9px" id="dDel">Delete phrase</button>`}
     <button class="btn ghost" style="margin-top:9px" id="dCancel">Cancel</button>
@@ -871,6 +1059,16 @@ function shrink(file,cb){
 
 async function saveConfig(btn){
   if(!API||!HOUSE||!CARE){ alert('Add the worker address, household code, and caregiver key first.'); return false; }
+
+  // A phone that has never downloaded the setup must not be allowed to upload
+  // one. This is exactly how a new person joining wiped everybody out.
+  if(!loaded){
+    const ok = await pull().then(()=>loaded).catch(()=>false);
+    if(!ok){
+      alert('Still downloading the current setup — nothing was saved.\n\nGive it a moment and try again. This is deliberate: it stops a phone that has not caught up yet from overwriting everyone.');
+      return false;
+    }
+  }
   const label = btn ? btn.textContent : null;
   if(btn){ btn.textContent='Saving…'; btn.disabled=true; }
   saving=true;
@@ -886,9 +1084,22 @@ async function saveConfig(btn){
   }catch(e){
     saving=false;
     if(btn){ btn.textContent=label; btn.disabled=false; }
-    alert('Could not save: '+e.message+'\n\nNothing was lost — try again.');
+    alert(e.message.length>60 ? e.message : 'Could not save: '+e.message+'\n\nNothing was lost — try again.');
     return false;
   }
+}
+
+/* Keeps the last few good setups on this phone. Independent of the server,
+   so a bad write can always be undone from here. Only setups with people in
+   them are kept, so an empty one can never push the good ones out. */
+function snapshot(cfg, at){
+  try{
+    const snaps=LS.get('snaps',[]);
+    const stamp=at||Date.now();
+    if(snaps.some(s=>s.at===stamp)) return;
+    snaps.unshift({at:stamp, people:(cfg.contacts||[]).length, tasks:(cfg.tasks||[]).length, cfg});
+    LS.set('snaps', snaps.slice(0,5));
+  }catch(e){}
 }
 
 function toast(msg){
@@ -905,14 +1116,25 @@ function toast(msg){
 document.addEventListener('click',async e=>{
   const t=e.target;
   const tb=t.closest('[data-tab]');
-  if(tb){ tab=tb.dataset.tab; sub=null; render(); if(tab==='msgs'){ const ids=MSGS.filter(m=>(m.dir==='out'||m.dir==='alert')&&!m.seen).map(m=>m.id); if(ids.length) post('/seen',{ids}).then(pull).catch(()=>{}); } return; }
+  if(tb){ tab=tb.dataset.tab; sub=null; secKey=null; render(); if(tab==='msgs'){ const ids=MSGS.filter(m=>(m.dir==='out'||m.dir==='alert')&&!m.seen).map(m=>m.id); if(ids.length) post('/seen',{ids}).then(pull).catch(()=>{}); } return; }
 
   if(t.id==='saveConn'){
     API=document.getElementById('sApi').value.trim();
     HOUSE=document.getElementById('sHouse').value.trim();
     CARE=document.getElementById('sCare').value.trim();
     LS.set('api',API); LS.set('house',HOUSE); LS.set('care',CARE);
-    if(!CFG) CFG=blank();
+    // Download before deciding anything. Only a genuinely empty household
+    // gets seeded with the starter setup.
+    t.textContent='Connecting…';
+    await pull();
+    if(loaded && CFG){
+      t.textContent='Connected ✓'; toast('Connected'); setTimeout(render,600);
+      return;
+    }
+    if(!confirm('No setup was found for this household code.\n\nCreate a new one? If you expected to join an existing setup, check the household code and worker address instead — creating a new one here is how existing setups get lost.')){
+      t.textContent='Save and connect'; return;
+    }
+    CFG=blank();
     if(await saveConfig(t)) await pull();
     return;
   }
@@ -925,15 +1147,15 @@ document.addEventListener('click',async e=>{
     await saveConfig(t); return;
   }
   if(t.id==='saveMe'){ ME=document.getElementById('sMe').value; LS.set('me',ME); render(); return; }
-  if(t.id==='invite'){
-    const who=prompt('Invite link for which person? (their exact name)');
-    if(!who) return;
-    const link=location.origin+location.pathname+'#api='+encodeURIComponent(API)+'&house='+encodeURIComponent(HOUSE)+'&care='+encodeURIComponent(CARE)+'&me='+encodeURIComponent(who);
-    navigator.clipboard.writeText(link).then(()=>alert('Copied. Send it to '+who+' privately — it contains the caregiver key.'),()=>prompt('Copy this:',link));
-    return;
-  }
   const ak=t.closest('[data-ack]');
   if(ak){ try{ await post('/ack',{id:+ak.dataset.ack, me:ME||'Someone'}); await pull(); }catch(e){ alert(e.message); } return; }
+  if(t.id==='sWhole'){
+    CFG=CFG||blank(); CFG.showWholeDay=!CFG.showWholeDay;
+    t.setAttribute('aria-pressed',CFG.showWholeDay);
+    t.textContent=CFG.showWholeDay?'The whole day at once':'Only what it is time for';
+    return;
+  }
+  if(t.id==='saveWhole'){ await saveConfig(t); return; }
   if(t.id==='saveRules'){
     CFG=CFG||blank();
     CFG.snoozeMinutes=+document.getElementById('sSnooze').value;
@@ -978,6 +1200,84 @@ document.addEventListener('click',async e=>{
     else alert('Use your browser menu, then "Install app" or "Add to Home screen".');
     return;
   }
+  const sc=t.closest('[data-sec]'); if(sc){ secKey=sc.dataset.sec; render(); return; }
+  if(t.id==='secBack'){ secKey=null; render(); return; }
+  if(t.id==='whoBack'){
+    try{
+      const r=await fetch(API.replace(/\/$/,'')+'/who?house='+encodeURIComponent(HOUSE));
+      const d=await r.json();
+      const names=(d.names||[]).map(x=>x.who).filter(n=>n && n!=='You' && n!=='Someone');
+      if(!names.length){ document.getElementById('whoOut').textContent='No names found in the message history.'; return; }
+      const have=new Set((CFG&&CFG.contacts||[]).map(c=>c.name));
+      const add=names.filter(n=>!have.has(n));
+      document.getElementById('whoOut').textContent =
+        'Found: '+names.join(', ')+(add.length?' — adding '+add.length+' back now. You will still need their ntfy topics.':' — all already present.');
+      if(add.length){
+        CFG=CFG||blank(); CFG.contacts=CFG.contacts||[];
+        add.forEach(n=>CFG.contacts.push({id:uid(),name:n,icon:'👩',photo:null,ntfy:'',busy:{days:[],from:'08:00',to:'17:00'},override:'auto',escalate:true,fallback:false,grace:null}));
+        await saveConfig(); render();
+      }
+    }catch(e){ document.getElementById('whoOut').textContent='Could not check: '+e.message; }
+    return;
+  }
+  const sn=t.closest('[data-snap]');
+  if(sn){
+    const snaps=LS.get('snaps',[])||[]; const chosen=snaps[+sn.dataset.snap];
+    if(!chosen) return;
+    if(!confirm('Use the copy from '+new Date(chosen.at).toLocaleString()+'? '+chosen.people+' people, '+chosen.tasks+' tasks.')) return;
+    CFG=chosen.cfg; loaded=true;
+    try{ const r=await post('/config',{config:CFG,force:true}); savedAt=(r&&r.updated)||Date.now(); LS.set('savedAt',savedAt); LS.set('config',CFG); toast('Restored'); render(); }
+    catch(e){ alert(e.message); }
+    return;
+  }
+  if(t.id==='expCfg'){
+    if(!CFG){ alert('Nothing to back up yet.'); return; }
+    const blob=new Blob([JSON.stringify(CFG,null,2)],{type:'application/json'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='independentme-backup-'+new Date().toISOString().slice(0,10)+'.json';
+    a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+    toast('Backup saved'); return;
+  }
+  if(t.id==='impCfg'){ document.getElementById('impFile').click(); return; }
+  if(t.id==='prevPeek'){
+    try{
+      const r=await fetch(API.replace(/\/$/,'')+'/prev?house='+encodeURIComponent(HOUSE));
+      const d=await r.json();
+      document.getElementById('prevOut').textContent = d.has
+        ? 'Previous version from '+new Date(d.at).toLocaleString()+': '+d.people+' people ('+(d.names||[]).join(', ')+') and '+d.tasks+' tasks.'
+        : 'No earlier version is stored yet.';
+    }catch(e){ document.getElementById('prevOut').textContent='Could not check: '+e.message; }
+    return;
+  }
+  if(t.id==='doRestore'){
+    if(!confirm('Swap back to the previous setup? The current one is kept, so you can press this again to swap forward.')) return;
+    try{
+      const r=await post('/restore',{});
+      if(r.config){ CFG=r.config; savedAt=r.updated||Date.now(); LS.set('config',CFG); LS.set('savedAt',savedAt); loaded=true; }
+      toast('Restored'); render();
+    }catch(e){ alert(e.message); }
+    return;
+  }
+  if(t.id==='pushLocal'){
+    const local=LS.get('config',null);
+    if(!local || !(local.contacts||[]).length){ alert('This phone has no better copy stored.'); return; }
+    if(!confirm('Upload this phone\'s setup — '+(local.contacts||[]).length+' people and '+(local.tasks||[]).length+' tasks — over what is on the server?')) return;
+    CFG=local;
+    try{ const r=await post('/config',{config:CFG,force:true}); savedAt=(r&&r.updated)||Date.now(); LS.set('savedAt',savedAt); loaded=true; toast('Uploaded'); render(); }
+    catch(e){ alert(e.message); }
+    return;
+  }
+  if(t.id==='testPush'){
+    const out=document.getElementById('pushOut');
+    out.textContent='Sending…';
+    try{
+      const r=await post('/testpush',{});
+      const lines=(r.sent||[]).map(x=>x.topic+': '+(x.status===200?'delivered to ntfy':'failed, status '+x.status+(x.error?' '+x.error:'')));
+      out.textContent = lines.length ? lines.join('\n') + '\n\nIf ntfy says delivered but no notification arrived, the phone is not subscribed to that exact topic, or notifications are switched off for the ntfy app.' : 'Nothing was sent.';
+    }catch(e){ out.textContent = e.message; }
+    return;
+  }
   if(t.id==='installApp'){
     if(installPrompt){ installPrompt.prompt(); installPrompt=null; }
     else alert('Use your browser menu, then Add to Home screen.');
@@ -992,6 +1292,21 @@ document.addEventListener('click',async e=>{
   }
   if(t.id==='ciCall'){ beginCall(); return; }
   if(t.id==='cHang'){ hangUp(); return; }
+  if(t.id==='ringYes'){
+    const inc=incoming;
+    HANDLED_CALLS[inc.id]=true; LS.set('handledCalls',HANDLED_CALLS);
+    document.getElementById('ring').classList.add('hide'); incoming=null;
+    startCall(inc.room,'b');
+    return;
+  }
+  if(t.id==='ringNo'){
+    const inc=incoming;
+    HANDLED_CALLS[inc.id]=true; LS.set('handledCalls',HANDLED_CALLS);
+    document.getElementById('ring').classList.add('hide'); incoming=null;
+    try{ await post('/signal',{room:inc.room,side:'b',kind:'end',payload:'null'}); }catch(e){}
+    try{ await post('/reply',{who:ME||'Someone',text:'Cannot talk right now',icon:'📵'}); }catch(e){}
+    return;
+  }
   const ph=t.closest('[data-photo]');
   if(ph){
     try{
@@ -1015,7 +1330,7 @@ document.addEventListener('click',async e=>{
   if(t.id==='sendBtn'){
     const box=document.getElementById('reply'), text=box.value.trim();
     if(!text) return;
-    try{ await post('/reply',{who:ME||'Someone',text,icon:'💬'}); box.value=''; await pull(); }
+    try{ await post('/reply',{who:ME||'Someone',text,icon:'💬'}); box.value=''; draftReply=''; await pull(); }
     catch(err){ alert('Could not send: '+err.message); }
     return;
   }
@@ -1037,6 +1352,46 @@ document.addEventListener('click',async e=>{
       : Object.assign({},CFG.contacts.find(x=>x.id===ec.dataset.econ));
     draft.busyDays=(draft.busy&&draft.busy.days)||[];
     sub='contact'; render(); return;
+  }
+  const rok=t.closest('[data-rok]');
+  if(rok){
+    const r=(CFG.rewards||[]).find(x=>x.id===rok.dataset.rok);
+    if(r){ r.ok = r.ok===false; await saveConfig(); render(); }
+    return;
+  }
+  const er=t.closest('[data-erew]');
+  if(er){
+    CFG=CFG||blank(); CFG.rewards=CFG.rewards||[];
+    draft = er.dataset.erew==='new'
+      ? {_new:true,id:uid(),name:'',icon:'svg:can',photo:null,ok:true,tier:'day'}
+      : Object.assign({},CFG.rewards.find(x=>x.id===er.dataset.erew));
+    sub='reward'; render(); return;
+  }
+  const tr=t.closest('[data-tier]');
+  if(tr){ draft.tier=tr.dataset.tier;
+    document.querySelectorAll('[data-tier]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.tier===draft.tier)); return; }
+  const kd=t.closest('[data-kind]');
+  if(kd){ draft.kind=kd.dataset.kind;
+    document.querySelectorAll('[data-kind]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.kind===draft.kind)); return; }
+  const fo=t.closest('[data-for]');
+  if(fo){
+    draft.for=draft.for||[];
+    const id=fo.dataset.for;
+    if(!id) draft.for=[];
+    else { const i=draft.for.indexOf(id); if(i>-1) draft.for.splice(i,1); else draft.for.push(id); }
+    document.querySelectorAll('[data-for]').forEach(x=>x.setAttribute('aria-pressed', x.dataset.for ? draft.for.includes(x.dataset.for) : !draft.for.length));
+    return;
+  }
+  if(t.id==='dROk'){ draft.ok = draft.ok===false; t.setAttribute('aria-pressed',draft.ok!==false); t.textContent=draft.ok===false?'Not today':'Yes'; return; }
+  if(t.id==='sRewOn'){
+    CFG=CFG||blank(); CFG.rewardOn=!CFG.rewardOn;
+    t.setAttribute('aria-pressed',CFG.rewardOn); t.textContent=CFG.rewardOn?'On':'Off'; return;
+  }
+  if(t.id==='saveRew'){
+    CFG=CFG||blank();
+    CFG.rewardNeed=+document.getElementById('sRewNeed').value||0;
+    CFG.weekNeedDays=+document.getElementById('sWeekNeed').value||7;
+    await saveConfig(t); return;
   }
   const ee=t.closest('[data-eev]');
   if(ee){
@@ -1106,7 +1461,7 @@ document.addEventListener('click',async e=>{
   if(ep){
     CFG=CFG||blank();
     draft = ep.dataset.ephr==='new'
-      ? {_new:true,id:uid(),text:'',icon:'👋'}
+      ? {_new:true,id:uid(),text:'',icon:'👋',kind:'need',for:[]}
       : Object.assign({},CFG.phrases.find(x=>x.id===ep.dataset.ephr));
     sub='phrase'; render(); return;
   }
@@ -1156,6 +1511,12 @@ document.addEventListener('click',async e=>{
       const i=CFG.contacts.findIndex(x=>x.id===draft.id);
       if(i>-1) CFG.contacts[i]=rec; else CFG.contacts.push(rec);
     }
+    if(sub==='reward'){
+      CFG.rewards=CFG.rewards||[];
+      const rec={id:draft.id,name:val,icon:draft.icon,photo:draft.photo,ok:draft.ok!==false,tier:draft.tier||'day'};
+      const i=CFG.rewards.findIndex(x=>x.id===draft.id);
+      if(i>-1) CFG.rewards[i]=rec; else CFG.rewards.push(rec);
+    }
     if(sub==='event'){
       CFG.events=CFG.events||[];
       const rec={id:draft.id,title:val,icon:draft.icon,photo:draft.photo,kind:draft.kind||'weekly',
@@ -1176,7 +1537,7 @@ document.addEventListener('click',async e=>{
       if(i>-1) CFG.wardrobe[i]=rec; else CFG.wardrobe.push(rec);
     }
     if(sub==='phrase'){
-      const rec={id:draft.id,text:val,icon:draft.icon};
+      const rec={id:draft.id,text:val,icon:draft.icon,kind:draft.kind||'need',for:draft.for||[]};
       const i=CFG.phrases.findIndex(x=>x.id===draft.id);
       if(i>-1) CFG.phrases[i]=rec; else CFG.phrases.push(rec);
     }
@@ -1189,12 +1550,39 @@ document.addEventListener('click',async e=>{
     if(sub==='phrase') CFG.phrases=CFG.phrases.filter(x=>x.id!==draft.id);
     if(sub==='ward') CFG.wardrobe=CFG.wardrobe.filter(x=>x.id!==draft.id);
     if(sub==='event') CFG.events=CFG.events.filter(x=>x.id!==draft.id);
+    if(sub==='reward') CFG.rewards=CFG.rewards.filter(x=>x.id!==draft.id);
     if(await saveConfig(t)){ sub=null; draft=null; setTimeout(render,450); }
     return;
   }
 });
 
+document.addEventListener('input',e=>{
+  if(e.target.id==='reply') draftReply=e.target.value;
+});
+
+/* Once the box is left alone, catch up on anything the refresh held back. */
+document.addEventListener('focusout',e=>{
+  if(e.target.id==='reply' && pendingRender) setTimeout(()=>{ if(pendingRender) render(); }, 300);
+});
+
 document.addEventListener('change',e=>{
+  if(e.target.id==='impFile'){
+    const f=e.target.files[0]; if(!f) return;
+    const r=new FileReader();
+    r.onload=async()=>{
+      try{
+        const cfg=JSON.parse(r.result);
+        if(!cfg || typeof cfg!=='object') throw new Error('That file is not a backup.');
+        if(!confirm('Load this backup? '+((cfg.contacts||[]).length)+' people, '+((cfg.tasks||[]).length)+' tasks.')) return;
+        CFG=cfg; loaded=true;
+        const res=await post('/config',{config:CFG,force:true});
+        savedAt=(res&&res.updated)||Date.now(); LS.set('savedAt',savedAt); LS.set('config',CFG);
+        toast('Backup loaded'); render();
+      }catch(err){ alert('Could not load that file: '+err.message); }
+    };
+    r.readAsText(f);
+    return;
+  }
   if(e.target.id==='dFile'){
     shrink(e.target.files[0],d=>{ draft.photo=d; document.getElementById('dPrev').innerHTML=`<img src="${d}">`; });
   }
@@ -1214,9 +1602,11 @@ function callShell(state){
   if(localStream) document.getElementById('vNear').srcObject=localStream;
 }
 
-async function beginCall(){
-  room='r'+Date.now()+Math.random().toString(36).slice(2,6); side='a'; since=0;
-  callShell('Ringing…');
+const beginCall = () => startCall('r'+Date.now()+Math.random().toString(36).slice(2,6), 'a');
+
+async function startCall(rm, sd){
+  room=rm; side=sd||'a'; since=0;
+  callShell(side==='a'?'Ringing…':'Connecting…');
   try{ localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); }
   catch(e){ alert('Could not open your camera or microphone.\n\n'+e.name+': '+e.message); return hangUp(); }
   document.getElementById('vNear').srcObject=localStream;
@@ -1230,9 +1620,11 @@ async function beginCall(){
   pc.onicecandidate=e=>{ if(e.candidate) sig('ice',e.candidate); };
   pc.onconnectionstatechange=()=>{ if(['failed','closed','disconnected'].includes(pc.connectionState)) hangUp(); };
 
-  const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
-  await sig('offer',offer);
-  await post('/call',{room,from:ME||'Someone',to:''}).catch(()=>{});
+  if(side==='a'){
+    const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
+    await sig('offer',offer);
+    await post('/call',{room,from:ME||'Someone',to:''}).catch(()=>{});
+  }
   poll=setInterval(async()=>{
     if(!room||!pc) return;
     try{
@@ -1242,7 +1634,12 @@ async function beginCall(){
         since=Math.max(since,it.id);
         if(it.side===side) continue;
         const p=JSON.parse(it.payload||'null');
-        if(it.kind==='answer'&&!pc.currentRemoteDescription) await pc.setRemoteDescription(p);
+        if(it.kind==='offer'){
+          await pc.setRemoteDescription(p);
+          const ans=await pc.createAnswer(); await pc.setLocalDescription(ans);
+          await sig('answer',ans);
+        }
+        else if(it.kind==='answer'&&!pc.currentRemoteDescription) await pc.setRemoteDescription(p);
         else if(it.kind==='ice'&&p){ try{ await pc.addIceCandidate(p); }catch(e){} }
         else if(it.kind==='end') hangUp();
       }

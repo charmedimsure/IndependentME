@@ -273,6 +273,34 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
 .installbar span{font-size:14px;font-weight:700;color:var(--ink-soft)}
 .installbar .go{background:var(--ink);color:var(--sky-1);border-radius:16px;padding:15px 22px;font-weight:800;font-size:17px;flex:none}
 .installbar .x{background:transparent;font-size:24px;padding:8px 6px;opacity:.4;flex:none}
+
+/* ---- working toward something ---- */
+.goal{background:var(--surface);border-radius:24px;box-shadow:var(--shadow);padding:16px 18px;
+  margin-bottom:14px;display:flex;align-items:center;gap:16px}
+.goal .gpic{width:74px;height:74px;border-radius:18px;flex:none;display:grid;place-items:center;font-size:40px;
+  background:linear-gradient(160deg,var(--sky-1),var(--sky-2));overflow:hidden}
+.goal .gpic img{width:100%;height:100%;object-fit:cover}
+.goal .gtxt{flex:1;min-width:0}
+.goal .gtxt b{font-family:var(--display);font-size:20px;display:block;line-height:1.1}
+.goal .gtxt span{font-size:14px;font-weight:700;color:var(--ink-soft)}
+.stars{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+.stars i{width:22px;height:22px;border-radius:50%;background:rgba(34,32,28,.14);font-style:normal;display:block}
+body[data-part="evening"] .stars i{background:rgba(255,255,255,.16)}
+.stars i.on{background:#E8A21C;box-shadow:0 0 0 2px rgba(232,162,28,.25)}
+
+.rpick{position:fixed;inset:0;z-index:114;overflow-y:auto;padding:26px 20px 40px;
+  background:linear-gradient(170deg,var(--sky-1),var(--sky-2))}
+.rpick h2{font-family:var(--display);font-size:40px;text-align:center;margin:6px 0 4px}
+.rpick p.sub{text-align:center;font-size:18px;font-weight:700;opacity:.6;margin:0 0 26px}
+.rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;max-width:820px;margin:0 auto}
+.ritem{background:var(--surface);border-radius:26px;box-shadow:var(--shadow);padding:18px 12px;
+  display:grid;place-items:center;gap:12px;border:4px solid transparent}
+.ritem[aria-pressed="true"]{border-color:var(--done)}
+.ritem .pic{width:110px;height:110px;border-radius:22px}
+.ritem b{font-family:var(--display);font-size:20px;text-align:center}
+.rbtns{max-width:820px;margin:26px auto 0;display:flex;gap:12px}
+.rbtns .ok{flex:1;background:#12793C;color:#fff;border-radius:24px;padding:22px;font-family:var(--display);font-weight:800;font-size:26px}
+.rbtns .skip{background:transparent;border:3px solid rgba(34,32,28,.22);border-radius:22px;padding:22px 24px;font-weight:800;font-size:18px}
 </style>
 </head>
 <body data-part="morning">
@@ -308,6 +336,7 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
   <button class="go" id="ibGo">Add</button>
   <button class="x" id="ibNo">✕</button>
 </div>
+<div class="rpick hide" id="rpick"></div>
 <div class="steps hide" id="steps"></div>
 <div class="warnbar hide" id="warnbar"></div>
 <div class="ask hide" id="ask"></div>
@@ -369,6 +398,7 @@ input[type=text]{width:100%;padding:14px;font:inherit;font-size:17px;color:var(-
    Used anywhere an icon value starts with "svg:".
    ============================================================ */
 const SVGI = {
+  can:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="10" width="24" height="44" rx="6"/><path d="M20 20h24M20 44h24"/><path d="M28 14h8"/></svg>',
   towel:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10h32a6 6 0 0 1 6 6v38a4 4 0 0 1-4 4H18a6 6 0 0 1-6-6V16a6 6 0 0 1 4-5.7z"/><path d="M16 10a6 6 0 0 0 0 12h8V10"/><path d="M22 32h20M22 40h20"/></svg>',
   sweater:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10h16l12 7-5 11-5-2.5V54H22V25.5L17 28l-5-11z"/><path d="M24 10c0 4.5 3.6 7 8 7s8-2.5 8-7"/><path d="M22 46h20"/></svg>',
   toothbrush:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 54 44 22"/><path d="M40 10l12 9-8 11-12-9z"/><path d="M18 50l-4 6 7-2z"/></svg>',
@@ -395,6 +425,7 @@ let SPEAK = LS.get('speak',true);
 let SOUND = LS.get('sound',true);
 let lastSeen = LS.get('lastSeen',0);
 let ACKED = LS.get('acked',{});
+setInterval(()=>{ const k='reward:'+todayKey(); if(rewardState && rewardState._k!==k){ rewardState=LS.get(k,{chosen:null,earned:false}); rewardState._k=k; LS.set(k,rewardState); } }, 60000);
 let RECENT = LS.get('recent',[]);
 let online = false;
 
@@ -486,6 +517,8 @@ async function sync(){
     DONE[todayKey()] = (data.done||[]).map(d=>d.id);
     LS.set('done',DONE);
     RECENT = data.recent||[]; LS.set('recent',RECENT);
+    if(!weekState) loadWeekState();
+    setTimeout(checkWeekReward, 1200);
 
     const known = new Set(MSGS.map(m=>m.id));
     MSGS = data.messages||[];
@@ -574,9 +607,13 @@ function renderHome(){
 
   let html='';
   if(!open.length){
+    const allDone = !later.length;
     html += `<div class="card" style="display:block;text-align:center;padding:40px 20px">
-      <div style="font-size:74px">🏆</div><div class="cname" style="margin-top:10px">Everything is done!</div>
-      <div class="cwhen">Great job today.</div></div>`;
+      <div style="font-size:74px">${allDone?'🏆':(part==='evening'?'🌙':'☕')}</div>
+      <div class="cname" style="margin-top:10px">${allDone?'Everything is done!':'Nothing to do right now'}</div>
+      <div class="cwhen">${allDone?'Great job today.':'I will tell you when it is time.'}</div>
+      <button class="mini" style="margin:14px auto 0" data-speak="${allDone?'Everything is done. Great job today.':'Nothing to do right now. I will tell you when it is time.'}">🔊</button>
+    </div>`;
   }
   let last='', chunk=[];
   open.forEach((t,i)=>{
@@ -641,6 +678,7 @@ function toggle(id){
   if(nowDone){
     chime();
     cheer(tasks().filter(dueToday).filter(x=>!isDone(x)).length, t.name);
+    setTimeout(checkReward, 2000);
   }
   renderHome();
 }
@@ -654,6 +692,149 @@ function cheer(left,name){
   el.classList.remove('hide');
   speak(all?'All done! You finished everything today.':name+' finished. Nice work.');
   setTimeout(()=>el.classList.add('hide'),1900);
+}
+
+/* ============================================================
+   Working toward something
+
+   She chooses what she's working for, at the start, and can see how
+   close she is without reading a number. Choosing is the part that
+   matters; a reward handed over as a surprise isn't the same thing.
+
+   Nothing here punishes a short day. The stars simply don't fill,
+   and tomorrow starts clean.
+   ============================================================ */
+const rewardKey = () => 'reward:'+todayKey();
+let rewardState = LS.get(rewardKey(), {chosen:null, earned:false});
+let weekState = null;      // set once CFG is loaded
+let pickingReward = false, pickTier='day';
+function loadWeekState(){ weekState = LS.get(weekKey(), {earned:false}); }
+
+const availableRewards = (tier) => ((CFG&&CFG.rewards)||[])
+  .filter(r=>r.ok!==false)
+  .filter(r=>(r.tier||'day')===(tier||'day'));
+
+/* ---- the week ---- */
+const weekStartOf = d => { const x=new Date(d); x.setDate(x.getDate()-x.getDay()); x.setHours(12,0,0,0); return x; };
+const weekKey = () => 'reward-week:'+dayKeyOf(weekStartOf(new Date()));
+
+/* A day counts when everything that was due that day got done. */
+function dayMet(d){
+  const dow=d.getDay(), key=dayKeyOf(d);
+  const due=tasks().filter(t=>t.freq==='daily'||(t.days||[]).includes(dow));
+  if(!due.length) return false;
+  return due.every(t=>RECENT.some(r=>r.task_id===t.id && r.day===key));
+}
+
+function weekProgress(){
+  const start=weekStartOf(new Date()), today=new Date();
+  const days=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(start); d.setDate(start.getDate()+i);
+    const past = d <= today;
+    const isToday = dayKeyOf(d)===todayKey();
+    days.push({d, met: isToday ? (starTarget()>0 && starsEarned()>=starTarget()) : (past && dayMet(d)), past, isToday});
+  }
+  return days;
+}
+const rewardsOn = () => CFG && CFG.rewardOn && availableRewards().length>0;
+function starTarget(){
+  if(!CFG) return 0;
+  const due = tasks().filter(dueToday).length;
+  const n = CFG.rewardNeed || 0;
+  return n>0 ? Math.min(n,due) : due;      // never ask for more than exists today
+}
+const starsEarned = () => tasks().filter(dueToday).filter(isDone).length;
+
+function goalCard(){
+  if(!rewardsOn()) return '';
+  const target=starTarget(); if(!target) return '';
+  const got=Math.min(starsEarned(),target);
+  const r=availableRewards().find(x=>x.id===rewardState.chosen);
+  return `<button class="goal" data-goal="1">
+    <div class="gpic">${r ? (r.photo?`<img src="${r.photo}" alt="">`:icoHTML(r.icon)) : '🎁'}</div>
+    <div class="gtxt">
+      <b>${r?esc(r.name):'Choose what you are working for'}</b>
+      <span>${rewardState.earned?'You earned it!':r?'Fill the circles':'Tap to choose'}</span>
+      <div class="stars">${Array.from({length:target},(_,i)=>`<i class="${i<got?'on':''}"></i>`).join('')}</div>
+    </div>
+  </button>`;
+}
+
+function openRewardPicker(){
+  pickingReward=true;
+  const list=availableRewards();
+  document.getElementById('rpick').innerHTML=`
+    <h2>What are you working for?</h2>
+    <p class="sub">Pick one for today</p>
+    <div class="rgrid">${list.map(r=>`
+      <button class="ritem" data-reward="${r.id}" aria-pressed="${rewardState.chosen===r.id}">
+        <div class="pic">${r.photo?`<img src="${r.photo}" alt="">`:icoHTML(r.icon)}</div>
+        <b>${esc(r.name)}</b></button>`).join('')}</div>
+    <div class="rbtns">
+      <button class="ok" id="rOk">✓ That one</button>
+      <button class="skip" id="rSkip">Not today</button>
+    </div>`;
+  document.getElementById('rpick').classList.remove('hide');
+  speak('What are you working for today? Pick one.');
+}
+
+function closeRewardPicker(){ document.getElementById('rpick').classList.add('hide'); pickingReward=false; renderHome(); }
+
+function chooseReward(id){
+  rewardState.chosen=id; LS.set(rewardKey(),rewardState);
+  const r=availableRewards('day').find(x=>x.id===id);
+  document.querySelectorAll('[data-reward]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.reward===id));
+  if(r) speak(r.name);
+}
+
+function checkReward(){
+  if(!rewardsOn() || rewardState.earned) return;
+  if(rewardState.chosen && !availableRewards().some(r=>r.id===rewardState.chosen)){
+    rewardState.chosen=null; LS.set(rewardKey(),rewardState);
+  }
+  const target=starTarget();
+  if(!target || starsEarned() < target) return;
+
+  rewardState.earned=true; LS.set(rewardKey(),rewardState);
+  const r=availableRewards('day').find(x=>x.id===rewardState.chosen);
+
+  // Telling someone is the point. An unclaimed reward is worse than none.
+  QUEUE.push({path:'/alert', body:{kind:'reward', who:'',
+    text:'Earned '+(r?r.name:'a reward')+' — finished '+target+' thing'+(target>1?'s':'')+' today'}});
+  LS.set('queue',QUEUE); flushQueue();
+
+  const el=document.getElementById('cheer');
+  document.getElementById('cheerIcon').textContent = r ? (r.photo?'🎉':r.icon) : '🎉';
+  document.getElementById('cheerTitle').textContent = 'You earned it!';
+  document.getElementById('cheerText').textContent = r ? r.name : 'Well done.';
+  el.classList.remove('hide');
+  chime([523,659,784,1047,1319]);
+  speak('You did it. You earned '+(r?r.name:'your reward')+'. I have told them.');
+  setTimeout(()=>el.classList.add('hide'), 4200);
+  setTimeout(checkWeekReward, 5200);
+}
+
+/* The week only pays out once, on the day it's completed. */
+function checkWeekReward(){
+  if(!CFG || !weekState || weekState.earned) return;
+  const wr=availableRewards('week')[0]; if(!wr) return;
+  const need=(CFG.weekNeedDays)||7;
+  const met=weekProgress().filter(d=>d.met).length;
+  if(met < need) return;
+
+  weekState.earned=true; LS.set(weekKey(),weekState);
+  QUEUE.push({path:'/alert', body:{kind:'reward', who:'', text:'Earned '+wr.name+' — '+met+' good days this week'}});
+  LS.set('queue',QUEUE); flushQueue();
+
+  const el=document.getElementById('cheer');
+  document.getElementById('cheerIcon').textContent = wr.photo?'🏅':wr.icon;
+  document.getElementById('cheerTitle').textContent = 'A whole week!';
+  document.getElementById('cheerText').textContent = wr.name;
+  el.classList.remove('hide');
+  chime([523,659,784,1047,1319,1568]);
+  speak('You did the whole week. You earned '+wr.name+'. I have told them.');
+  setTimeout(()=>el.classList.add('hide'), 5200);
 }
 
 /* ============================================================
@@ -1233,7 +1414,7 @@ const sKey = t => todayKey()+'|'+t.id;
 
 function checkReminders(){
   if(awayNow()) return;                                  // she isn't here
-  if(alarmTask || timerTask || outfitTask || stepTask || askMsg || callRoom) return;   // one thing at a time
+  if(alarmTask || timerTask || outfitTask || stepTask || askMsg || callRoom || pickingReward) return;   // one thing at a time
   const nowM = new Date().getHours()*60 + new Date().getMinutes();
   const due = tasks().filter(dueToday)
     .filter(t=>!isDone(t))
@@ -1407,7 +1588,7 @@ function renderMsg(){
     html += `<div class="group-label">Say something</div><div class="grid2">`+contacts.map(c=>
       `<button class="person" data-contact="${c.id}"><div class="pic">${c.photo?`<img src="${c.photo}" alt="">`:icoHTML(c.icon)}</div><b>${esc(c.name)}</b></button>`
     ).join('')+`</div>`;
-    const recent = MSGS.filter(m=>!(m.dir==='in'&&m.id>lastSeen)).slice(-8).reverse();
+    const recent = MSGS.filter(m=>m.dir==='in'||m.dir==='out').filter(m=>!(m.dir==='in'&&m.id>lastSeen)).slice(-8).reverse();
     if(recent.length) html += `<div class="group-label">Earlier</div>`+recent.map(bubbleHTML).join('');
     body.innerHTML=html;
     if(unread.length){
@@ -1422,8 +1603,19 @@ function renderMsg(){
   if(!c){ picked=null; return renderMsg(); }
   title.firstChild.nodeValue='Message '+c.name;
   sub.textContent='Pick what to say';
-  body.innerHTML = `<button class="btn ghost" style="margin-bottom:18px;max-width:320px" data-back="1">← Pick someone else</button>`+
-    phrases.map(p=>`<button class="say" data-send="${p.id}"><em>${p.icon}</em><b>${esc(p.text)}</b></button>`).join('');
+  // Only what makes sense to say to this person, split into two short lists
+  // rather than one long one.
+  const mine = phrases.filter(p=>!(p.for||[]).length || (p.for||[]).includes(c.id));
+  const needs = mine.filter(p=>(p.kind||'need')==='need');
+  const nice  = mine.filter(p=>p.kind==='nice');
+  const row = list => list.map(p=>
+    `<button class="say" data-send="${p.id}"><em>${p.icon}</em><b>${esc(p.text)}</b></button>`).join('');
+
+  body.innerHTML = `<button class="btn ghost" style="margin-bottom:18px;max-width:320px" data-back="1">← Pick someone else</button>
+    <button class="say" data-callp="${c.id}" style="background:#2B4FD0;color:#fff">
+      <em>📹</em><b>Video call ${esc(c.name)}</b></button>
+    ${needs.length?`<div class="group-label">Something I need</div>`+row(needs):''}
+    ${nice.length?`<div class="group-label">Something nice</div>`+row(nice):''}`;
 }
 
 function bubbleHTML(m){
@@ -1475,6 +1667,10 @@ document.addEventListener('click', e=>{
   const dr=t.closest('[data-dress]');
   if(dr){ const task=tasks().find(x=>x.id===dr.dataset.dress); if(task) openOutfit(task); return; }
   if(t.closest('#aDress')){ const task=alarmTask; closeAlarm(); openOutfit(task); return; }
+  const gb=t.closest('[data-goal]'); if(gb){ openRewardPicker(gb.dataset.goal); return; }
+  const rw=t.closest('[data-reward]'); if(rw){ chooseReward(rw.dataset.reward); return; }
+  if(t.closest('#rOk')){ closeRewardPicker(); return; }
+  if(t.closest('#rSkip')){ closeRewardPicker(); return; }
   if(t.closest('#sNext')){ nextStep(); return; }
   if(t.closest('#sBack')){ prevStep(); return; }
   if(t.closest('#sStop')){ closeSteps(); speak('Okay. You can come back to it.'); return; }
@@ -1507,6 +1703,16 @@ document.addEventListener('click', e=>{
   const sp=t.closest('[data-speak]'); if(sp){ speak(sp.dataset.speak); return; }
   const pc=t.closest('[data-contact]'); if(pc){ picked=pc.dataset.contact; renderMsg(); return; }
   if(t.closest('[data-back]')){ picked=null; renderMsg(); return; }
+  const cp=t.closest('[data-callp]');
+  if(cp){
+    const person=((CFG&&CFG.contacts)||[]).find(x=>x.id===cp.dataset.callp);
+    if(person){
+      const room='r'+Date.now()+Math.random().toString(36).slice(2,6);
+      picked=null;
+      startCall(room,'a',person.name);
+    }
+    return;
+  }
   const sd=t.closest('[data-send]'); if(sd){ send(sd.dataset.send); return; }
 
   if(t.id==='setupClose'){ document.getElementById('setup').classList.add('hide'); return; }
@@ -1640,7 +1846,7 @@ if('serviceWorker' in navigator){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-21-f';
+const APP_VERSION='2026-07-21-r';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
@@ -1686,6 +1892,7 @@ function unlockAudio(){
 }
 document.addEventListener('pointerdown', unlockAudio, {once:false});
 
+loadWeekState();
 renderHome(); renderMsg(); updateBadge();
 sync(); loadWeather();
 setInterval(loadWeather, 1800000);

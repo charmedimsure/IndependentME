@@ -33,18 +33,39 @@ const today = () => {
 
 /* Push to one person's ntfy topic, or to everyone's. Best effort: a failed
    push must never stop a message from being recorded. */
+/* HTTP headers can only carry Latin-1. An arrow or an em dash in the title
+   makes setting the header throw, which silently kills the whole push, so
+   everything going into a header gets flattened first. The body is UTF-8 and
+   can keep its accents and emoji. */
+const hdr = v => String(v == null ? '' : v)
+  .replace(/[\u2012-\u2015\u2212]/g, '-')
+  .replace(/[\u2018\u2019]/g, "'")
+  .replace(/[\u201C\u201D]/g, '"')
+  .replace(/\u2192/g, '>')
+  .replace(/\u2026/g, '...')
+  .replace(/[^\x20-\x7E]/g, '')
+  .slice(0, 200) || 'IndependentME';
+
 async function pushTo(topics, title, text, urgent) {
-  await Promise.all([...new Set(topics.filter(Boolean))].map(topic =>
-    fetch('https://ntfy.sh/' + topic, {
-      method: 'POST',
-      headers: {
-        Title: title,
-        Tags: urgent ? 'sos' : 'speech_balloon',
-        Priority: urgent ? 'urgent' : 'high'
-      },
-      body: text
-    }).catch(() => {})
-  ));
+  const list = [...new Set((topics || []).filter(Boolean))];
+  const results = await Promise.all(list.map(async topic => {
+    try {
+      const r = await fetch('https://ntfy.sh/' + encodeURIComponent(topic), {
+        method: 'POST',
+        headers: {
+          'Title': hdr(title),
+          'Tags': urgent ? 'sos' : 'speech_balloon',
+          'Priority': urgent ? 'urgent' : 'high',
+          'Content-Type': 'text/plain; charset=utf-8'
+        },
+        body: String(text == null ? '' : text)
+      });
+      return { topic, status: r.status };
+    } catch (e) {
+      return { topic, status: 0, error: String(e && e.message || e) };
+    }
+  }));
+  return results;
 }
 
 const loadConfig = async (env, house) => {
@@ -162,7 +183,7 @@ export default {
 
           // Buzzes the person she picked. Everyone still sees it in the thread.
           const cfg = await loadConfig(env, house);
-          await pushTo(topicsFor(cfg, who), (cfg.name || 'IndependentME') + ' \u2192 ' + (who || 'everyone'), text, false);
+          await pushTo(topicsFor(cfg, who), (cfg.name || 'IndependentME') + ' to ' + (who || 'everyone'), text, false);
           return json({ ok: true });
         }
 
@@ -171,16 +192,17 @@ export default {
           const { text, kind, who } = body;
           if (!text) return json({ error: 'Missing text' }, 400);
           const help = kind === 'help';
+          const reward = kind === 'reward';
 
           await env.DB.prepare(
             'INSERT INTO messages (code, dir, who, body, icon, at, seen, escalated) VALUES (?, ?, ?, ?, ?, ?, 0, ?)'
-          ).bind(house, 'alert', who || '', text, help ? '\u{1F198}' : '\u23F0', Date.now(), help ? 0 : 1).run();
+          ).bind(house, 'alert', who || '', text, help ? '\u{1F198}' : reward ? '\u{1F381}' : '\u23F0', Date.now(), help ? 0 : 1).run();
 
           const cfg = await loadConfig(env, house);
           let topics;
           if (help) {
             topics = topicsFor(cfg, who);           // she chose this person
-          } else if (cfg.nudgeTo === 'all') {
+          } else if (reward || cfg.nudgeTo === 'all') {
             topics = topicsFor(cfg, null);
           } else {
             // Routine nudges go only to whoever is marked as the fallback, so
@@ -280,6 +302,55 @@ export default {
           return json({ ok: true });
         }
 
+        /* ---------- prove notifications work ---------- */
+        case '/testpush': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          const cfg = await loadConfig(env, house);
+          const topics = body.topic
+            ? [body.topic]
+            : (cfg.contacts || []).map(p => p.ntfy).filter(Boolean);
+          if (!topics.length) return json({ error: 'No ntfy topics are set on anyone', sent: [] }, 400);
+          const sent = await pushTo(topics, (cfg.name || 'IndependentME') + ' test',
+            'If you can read this, notifications are working.', false);
+          return json({ ok: true, sent });
+        }
+
+        /* ---------- who has been in this household ---------- */
+        case '/who': {
+          // Names survive in the message history even when the setup is lost
+          const rows = await env.DB.prepare(
+            `SELECT who, COUNT(*) n, MAX(at) last FROM messages
+             WHERE code = ? AND who IS NOT NULL AND who != '' AND who != 'help' AND who != 'reminder'
+             GROUP BY who ORDER BY n DESC`
+          ).bind(house).all();
+          return json({ names: rows.results || [] });
+        }
+
+        /* ---------- undo a bad save ---------- */
+        case '/restore': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          const row = await env.DB.prepare('SELECT config, prev_config, prev_updated FROM household WHERE code = ?')
+            .bind(house).first();
+          if (!row || !row.prev_config) return json({ error: 'There is no earlier version stored' }, 404);
+
+          const now = Date.now();
+          await env.DB.prepare(
+            'UPDATE household SET prev_config = ?, prev_updated = ?, config = ?, updated = ? WHERE code = ?'
+          ).bind(row.config, now, row.prev_config, now, house).run();
+          return json({ ok: true, updated: now, config: JSON.parse(row.prev_config) });
+        }
+
+        /* ---------- what's in the previous version, without restoring it ---------- */
+        case '/prev': {
+          const row = await env.DB.prepare('SELECT prev_config, prev_updated FROM household WHERE code = ?')
+            .bind(house).first();
+          if (!row || !row.prev_config) return json({ has: false });
+          const c = JSON.parse(row.prev_config);
+          return json({ has: true, at: row.prev_updated,
+            people: (c.contacts || []).length, tasks: (c.tasks || []).length,
+            names: (c.contacts || []).map(x => x.name) });
+        }
+
         /* ---------- clearing out old messages ---------- */
         case '/purge': {
           if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
@@ -325,7 +396,32 @@ export default {
           if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
           if (!body.config) return json({ error: 'Missing config' }, 400);
 
+          const existing = await env.DB.prepare('SELECT config, updated FROM household WHERE code = ?')
+            .bind(house).first();
+
+          // Refuse a write that would empty out a household that isn't empty.
+          // This is what happens when a new phone saves before it has finished
+          // downloading, and it must never silently overwrite everyone.
+          if (existing && !body.force) {
+            const old = JSON.parse(existing.config || '{}');
+            const neu = body.config;
+            const shrank = (a, b) => (a || []).length > 0 && (b || []).length === 0;
+            if (shrank(old.contacts, neu.contacts) ||
+                shrank(old.tasks, neu.tasks) ||
+                ((old.tasks || []).length > 2 && (neu.tasks || []).length === 0)) {
+              return json({
+                error: 'That save would have wiped the existing setup, so it was blocked. ' +
+                       'Let the app finish loading, then try again.',
+                blocked: true
+              }, 409);
+            }
+          }
+
           const now = Date.now();
+          if (existing) {
+            await env.DB.prepare('UPDATE household SET prev_config = ?, prev_updated = ? WHERE code = ?')
+              .bind(existing.config, existing.updated, house).run();
+          }
           await env.DB.prepare(
             `INSERT INTO household (code, care, config, updated) VALUES (?, ?, ?, ?)
              ON CONFLICT(code) DO UPDATE SET
@@ -382,6 +478,12 @@ export default {
       const cfg = JSON.parse(h.config || '{}');
       await env.DB.prepare('DELETE FROM signal WHERE code = ? AND at < ?')
         .bind(h.code, Date.now() - 3600000).run();
+
+      // Call invites and check-in requests are only meaningful for a few
+      // minutes. Left alone they pile up in the thread.
+      await env.DB.prepare(
+        "DELETE FROM messages WHERE code = ? AND dir IN ('call','ask') AND at < ?"
+      ).bind(h.code, Date.now() - 7200000).run();
 
       // Optional housekeeping so the thread doesn't grow forever
       if (cfg.keepDays) {
