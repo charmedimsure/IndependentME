@@ -1,6 +1,6 @@
 {
-  "name": "IndependentME Care",
-  "short_name": "Care",
+  "name": "IndependentME Kare",
+  "short_name": "Kare",
   "start_url": "./care.html",
   "scope": "./",
   "display": "standalone",

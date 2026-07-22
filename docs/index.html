@@ -603,8 +603,20 @@ function renderHome(){
     drawArc(); return;
   }
   const list = tasks().filter(dueToday).sort((a,b)=>effTime(a)-effTime(b));
-  const open = list.filter(t=>!isDone(t)), fin = list.filter(isDone);
   if(!list.length){ box.innerHTML=`<div class="empty"><em>🌤️</em>Nothing on the list today.</div>`; drawArc(); return; }
+
+  /* Don't offer a task until it's time to do it. A button she can press is an
+     invitation to press it, so the 6pm shower must not be tappable at 8am.
+     On a day a task is scheduled (daily, or a weekly on its day) it waits for
+     its time. A weekly that was actually missed on an earlier day floats as
+     available on the days after, so it isn't lost. The care app can switch
+     all this off with "show the whole day at once". */
+  const scheduledToday = t => t.freq==='daily' || (t.days||[]).includes(now.getDay());
+  const showAll = CFG && CFG.showWholeDay;
+  const ready = t => showAll || (scheduledToday(t) ? effTime(t) <= nowM : carriedOver(t));
+  const open  = list.filter(t=>!isDone(t) && ready(t));
+  const later = list.filter(t=>!isDone(t) && !ready(t));
+  const fin   = list.filter(isDone);
 
   let html='';
   if(!open.length){
@@ -1932,7 +1944,7 @@ if('serviceWorker' in navigator){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-21-w';
+const APP_VERSION='2026-07-21-z';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
