@@ -1712,7 +1712,18 @@ function renderMsg(){
   sub.textContent='Pick what to say';
   // Only what makes sense to say to this person, split into two short lists
   // rather than one long one.
-  const mine = phrases.filter(p=>!(p.for||[]).length || (p.for||[]).includes(c.id));
+  // A phrase can be aimed at particular people. Targeting is matched by name
+  // or id; if a phrase points only at people who no longer exist (ids left
+  // over from before a rebuild), it's shown to everyone rather than vanishing.
+  const known = new Set(); ((CFG&&CFG.contacts)||[]).forEach(x=>{ known.add(x.id); known.add(x.name); });
+  const forMatch = p => {
+    const f = p.for||[];
+    if(!f.length) return true;
+    if(f.includes(c.id) || f.includes(c.name)) return true;
+    if(f.every(x=>!known.has(x))) return true;   // orphaned -> show to all
+    return false;
+  };
+  const mine = phrases.filter(forMatch);
   const needs = mine.filter(p=>(p.kind||'need')==='need');
   const nice  = mine.filter(p=>p.kind==='nice');
   const row = list => list.map(p=>
@@ -1996,7 +2007,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-b';
+const APP_VERSION='2026-07-22-c';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });

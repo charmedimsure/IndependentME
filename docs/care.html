@@ -331,10 +331,10 @@ const blank=()=>({
 
     {id:uid(),icon:'❤️',text:'I love you.',                  kind:'nice',for:[]},
     {id:uid(),icon:'👋',text:'Hi! Thinking about you.',        kind:'nice',for:[]},
-    {id:uid(),icon:'🏆',text:"You're the best Dad.",           kind:'nice',for:[blankIds.dad]},
+    {id:uid(),icon:'🏆',text:"You're the best Dad.",           kind:'nice',for:['Dad']},
     {id:uid(),icon:'🚗',text:"You're an excellent driver.",    kind:'nice',for:[]},
     {id:uid(),icon:'💪',text:'Dad is the strongest.',          kind:'nice',for:[]},
-    {id:uid(),icon:'💕',text:"You're the best sister.",        kind:'nice',for:[blankIds.nan, blankIds.shel]},
+    {id:uid(),icon:'💕',text:"You're the best sister.",        kind:'nice',for:['Nan','Shelby']},
     {id:uid(),icon:'🍳',text:'Mom is excellent at making dinner.',kind:'nice',for:[]}
   ]
 });
@@ -709,7 +709,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-b</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-c</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1091,7 +1091,7 @@ function editPhrase(){
     <label class="f">Who it's for</label>
     <div class="row" style="flex-wrap:wrap">
       <button class="chip" data-for="" aria-pressed="${!(p.for||[]).length}">Anyone</button>
-      ${(CFG&&CFG.contacts||[]).map(c=>`<button class="chip" data-for="${c.id}" aria-pressed="${(p.for||[]).includes(c.id)}">${esc(c.name)}</button>`).join('')}
+      ${(CFG&&CFG.contacts||[]).map(c=>`<button class="chip" data-for="${esc(c.name)}" aria-pressed="${(p.for||[]).includes(c.name)}">${esc(c.name)}</button>`).join('')}
     </div>
     <p class="note" style="margin-top:8px">Keeps "You're the best Dad" from turning up when she's messaging her sister.</p>
     <button class="btn" style="margin-top:18px" id="dSave">Save phrase</button>
