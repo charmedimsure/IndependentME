@@ -544,7 +544,7 @@ function viewMsgs(){
         <button data-purge="all" style="color:var(--miss);border-color:var(--miss)">Delete everything</button>
       </div>`:''}
       ${
-      MSGS.length ? MSGS.slice().reverse().map(m=>
+      MSGS.filter(m=>m.dir!=='call' && m.dir!=='ask').length ? MSGS.filter(m=>m.dir!=='call' && m.dir!=='ask').slice().reverse().map(m=>
         m.dir==='alert'
         ? `<div class="msg from"><div class="av">${m.icon||'⏰'}</div><div>
              <div class="b ${m.seen?'':'unseen'}" style="background:${m.icon==='🆘'?'rgba(232,96,76,.16);color:var(--miss)':'rgba(242,179,61,.14);color:var(--warn)'}">${esc(m.body)}</div>
@@ -712,7 +712,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-e</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-f</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
