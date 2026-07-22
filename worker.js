@@ -87,6 +87,117 @@ function freeNow(person, now) {
   return cur < mins(b.from) || cur >= mins(b.to);
 }
 
+
+/* ============================================================
+   Web Push (RFC 8291 encryption + VAPID RFC 8292 auth)
+
+   Sends notifications straight to the browser's push service (FCM on
+   Android), so there's no second app to install and nothing to keep alive
+   in the background. Pure Web Crypto, no libraries. This code was tested
+   by round-tripping its own ciphertext before shipping.
+
+   The private key lives in env.VAPID_PRIVATE (a wrangler secret). The
+   public key is not secret and is shared with the browser.
+   ============================================================ */
+const VAPID_PUBLIC = 'BHA-7JKE7UorEGzriIvV5M0SWXHf-xaddmBzuip7_GpVuMVc1eoXDPoKJAtUmYqNsT9hhvQBZqGUZrDowk1SByo';
+
+const _b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const _ub64 = s => { s=s.replace(/-/g,'+').replace(/_/g,'/'); const b=atob(s); return Uint8Array.from(b, c=>c.charCodeAt(0)); };
+const _cat = (...a)=>{ let n=a.reduce((s,x)=>s+x.length,0), o=new Uint8Array(n), i=0; for(const x of a){o.set(x,i); i+=x.length;} return o; };
+const _te = s => new TextEncoder().encode(s);
+
+async function _hkdf(salt, ikm, info, len){
+  const key = await crypto.subtle.importKey('raw', ikm, 'HKDF', false, ['deriveBits']);
+  return new Uint8Array(await crypto.subtle.deriveBits({name:'HKDF', hash:'SHA-256', salt, info}, key, len*8));
+}
+async function _vapidJWT(endpoint, privB64, subject){
+  const aud = new URL(endpoint).origin;
+  const header = _b64u(_te(JSON.stringify({typ:'JWT', alg:'ES256'})));
+  const body   = _b64u(_te(JSON.stringify({aud, exp: Math.floor(Date.now()/1000)+12*3600, sub: subject})));
+  const priv = await crypto.subtle.importKey('pkcs8', _ub64(privB64), {name:'ECDSA', namedCurve:'P-256'}, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign({name:'ECDSA', hash:'SHA-256'}, priv, _te(header+'.'+body)));
+  return header+'.'+body+'.'+_b64u(sig);
+}
+async function _encryptPush(plaintext, p256dhB64, authB64){
+  const uaPub = _ub64(p256dhB64), authSec = _ub64(authB64);
+  const as = await crypto.subtle.generateKey({name:'ECDH', namedCurve:'P-256'}, true, ['deriveBits']);
+  const asPub = new Uint8Array(await crypto.subtle.exportKey('raw', as.publicKey));
+  const uaKey = await crypto.subtle.importKey('raw', uaPub, {name:'ECDH', namedCurve:'P-256'}, false, []);
+  const ecdh = new Uint8Array(await crypto.subtle.deriveBits({name:'ECDH', public:uaKey}, as.privateKey, 256));
+  const keyInfo = _cat(_te('WebPush: info'), new Uint8Array([0]), uaPub, asPub);
+  const ikm = await _hkdf(authSec, ecdh, keyInfo, 32);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const cek = await _hkdf(salt, ikm, _te('Content-Encoding: aes128gcm\0'), 16);
+  const nonce = await _hkdf(salt, ikm, _te('Content-Encoding: nonce\0'), 12);
+  const rec = _cat(_te(plaintext), new Uint8Array([2]));
+  const cekKey = await crypto.subtle.importKey('raw', cek, {name:'AES-GCM'}, false, ['encrypt']);
+  const ct = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv:nonce}, cekKey, rec));
+  const head = _cat(salt, new Uint8Array([0,0,0x10,0]), new Uint8Array([asPub.length]), asPub);
+  return _cat(head, ct);
+}
+async function webPushOne(env, sub, title, body){
+  try{
+    if(!env || !env.VAPID_PRIVATE) return { status:0, error:'no VAPID_PRIVATE set' };
+    const payload = JSON.stringify({ title, body });
+    const enc = await _encryptPush(payload, sub.p256dh, sub.auth);
+    const jwt = await _vapidJWT(sub.endpoint, env.VAPID_PRIVATE, 'mailto:care@independentme.app');
+    const r = await fetch(sub.endpoint, {
+      method:'POST',
+      headers:{
+        'TTL':'86400',
+        'Content-Encoding':'aes128gcm',
+        'Content-Type':'application/octet-stream',
+        'Authorization':'vapid t='+jwt+', k='+VAPID_PUBLIC
+      },
+      body: enc
+    });
+    return { status:r.status };
+  }catch(e){ return { status:0, error:String(e&&e.message||e) }; }
+}
+
+// Web subscriptions stored for a given caregiver name.
+async function webSubsFor(env, house, name){
+  const rows = await env.DB.prepare('SELECT person, endpoint, p256dh, auth FROM push_subs WHERE code = ? AND person = ?')
+    .bind(house, name).all();
+  return rows.results || [];
+}
+
+// Resolve who -> list of caregiver names. '' or null means everyone.
+function namesFor(cfg, who){
+  const people = cfg.contacts || [];
+  if(!who) return people.map(p => p.name);
+  const one = people.find(p => p.name === who || p.id === who);
+  return one ? [one.name] : people.map(p => p.name);
+}
+
+/* Notify people by name. Web Push if they have a subscription, otherwise
+   their ntfy topic, so nobody who hasn't migrated loses notifications and
+   nobody gets doubled up. Best effort. */
+async function notify(env, house, cfg, names, title, body, urgent){
+  const results = [];
+  for(const name of [...new Set(names.filter(Boolean))]){
+    const subs = await webSubsFor(env, house, name);
+    if(subs.length){
+      for(const sub of subs){
+        const r = await webPushOne(env, sub, title, body);
+        results.push({ name, via:'web', status:r.status, error:r.error });
+        // a dead subscription (410 Gone / 404) should be forgotten
+        if(r.status === 410 || r.status === 404){
+          await env.DB.prepare('DELETE FROM push_subs WHERE code = ? AND endpoint = ?').bind(house, sub.endpoint).run();
+        }
+      }
+    } else {
+      const person = (cfg.contacts||[]).find(p => p.name === name);
+      const topic = person && person.ntfy;
+      if(topic){
+        const r = await pushTo([topic], title, body, urgent);
+        results.push({ name, via:'ntfy', status:(r[0]&&r[0].status)||0, error:r[0]&&r[0].error });
+      }
+    }
+  }
+  return results;
+}
+
 const topicsFor = (cfg, name) => {
   const people = cfg.contacts || [];
   if (!name) return people.map(p => p.ntfy);
@@ -183,7 +294,7 @@ export default {
 
           // Buzzes the person she picked. Everyone still sees it in the thread.
           const cfg = await loadConfig(env, house);
-          await pushTo(topicsFor(cfg, who), (cfg.name || 'IndependentME') + ' to ' + (who || 'everyone'), text, false);
+          await notify(env, house, cfg, namesFor(cfg, who), (cfg.name || 'IndependentME') + ' to ' + (who || 'everyone'), text, false);
           return json({ ok: true });
         }
 
@@ -199,18 +310,18 @@ export default {
           ).bind(house, 'alert', who || '', text, help ? '\u{1F198}' : reward ? '\u{1F381}' : '\u23F0', Date.now(), help ? 0 : 1).run();
 
           const cfg = await loadConfig(env, house);
-          let topics;
+          let names;
           if (help) {
-            topics = topicsFor(cfg, who);           // she chose this person
+            names = namesFor(cfg, who);             // she chose this person
           } else if (reward || cfg.nudgeTo === 'all') {
-            topics = topicsFor(cfg, null);
+            names = namesFor(cfg, null);
           } else {
             // Routine nudges go only to whoever is marked as the fallback, so
             // four phones don't buzz about teeth.
             const prim = (cfg.contacts || []).filter(p => p.fallback);
-            topics = (prim.length ? prim : (cfg.contacts || [])).map(p => p.ntfy);
+            names = (prim.length ? prim : (cfg.contacts || [])).map(p => p.name);
           }
-          await pushTo(topics, cfg.name || 'IndependentME', text, help);
+          await notify(env, house, cfg, names, cfg.name || 'IndependentME', text, help);
           return json({ ok: true });
         }
 
@@ -225,7 +336,7 @@ export default {
           ).bind(me || 'Someone', Date.now(), house, id).run();
 
           const cfg = await loadConfig(env, house);
-          await pushTo(topicsFor(cfg, null), cfg.name || 'IndependentME',
+          await notify(env, house, cfg, namesFor(cfg, null), cfg.name || 'IndependentME',
             (me || 'Someone') + ' has got this one', false);
           return json({ ok: true });
         }
@@ -250,7 +361,7 @@ export default {
             .bind('answered', Date.now(), house, askId).run();
 
           const cfg = await loadConfig(env, house);
-          await pushTo(topicsFor(cfg, who), cfg.name || 'IndependentME', 'Sent you a photo', false);
+          await notify(env, house, cfg, namesFor(cfg, who), cfg.name || 'IndependentME', 'Sent you a photo', false);
           return json({ ok: true });
         }
 
@@ -270,7 +381,7 @@ export default {
             'INSERT INTO messages (code, dir, who, body, icon, at, seen) VALUES (?, ?, ?, ?, ?, ?, 0)'
           ).bind(house, 'out', who || '', 'Not right now', '\u{1F6AB}', Date.now()).run();
           const cfg = await loadConfig(env, house);
-          await pushTo(topicsFor(cfg, who), cfg.name || 'IndependentME', 'Not right now', false);
+          await notify(env, house, cfg, namesFor(cfg, who), cfg.name || 'IndependentME', 'Not right now', false);
           return json({ ok: true });
         }
 
@@ -283,7 +394,7 @@ export default {
             'INSERT INTO messages (code, dir, who, body, icon, at, seen, escalated) VALUES (?, ?, ?, ?, ?, ?, 0, 1)'
           ).bind(house, 'call', to || '', room + '|' + (from || ''), '\u{1F4F9}', Date.now()).run();
           const cfg = await loadConfig(env, house);
-          if (to) await pushTo(topicsFor(cfg, to), cfg.name || 'IndependentME', (from || 'Someone') + ' is calling', true);
+          if (to) await notify(env, house, cfg, namesFor(cfg, to), cfg.name || 'IndependentME', (from || 'Someone') + ' is calling', true);
           return json({ ok: true });
         }
 
@@ -303,15 +414,40 @@ export default {
         }
 
         /* ---------- prove notifications work ---------- */
+        /* ---------- the browser hands us its push subscription ---------- */
+        case '/subscribe': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          const { person, sub } = body;
+          if (!person || !sub || !sub.endpoint || !sub.keys) return json({ error: 'Bad subscription' }, 400);
+          await env.DB.prepare(
+            `INSERT INTO push_subs (code, person, endpoint, p256dh, auth, updated)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(code, endpoint) DO UPDATE SET
+               person = excluded.person, p256dh = excluded.p256dh,
+               auth = excluded.auth, updated = excluded.updated`
+          ).bind(house, person, sub.endpoint, sub.keys.p256dh, sub.keys.auth, Date.now()).run();
+          return json({ ok: true });
+        }
+
+        case '/unsubscribe': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          if (body.endpoint) await env.DB.prepare('DELETE FROM push_subs WHERE code = ? AND endpoint = ?')
+            .bind(house, body.endpoint).run();
+          return json({ ok: true });
+        }
+
+        /* ---------- the browser needs the public key to subscribe ---------- */
+        case '/vapid': {
+          return json({ key: VAPID_PUBLIC });
+        }
+
         case '/testpush': {
           if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
           const cfg = await loadConfig(env, house);
-          const topics = body.topic
-            ? [body.topic]
-            : (cfg.contacts || []).map(p => p.ntfy).filter(Boolean);
-          if (!topics.length) return json({ error: 'No ntfy topics are set on anyone', sent: [] }, 400);
-          const sent = await pushTo(topics, (cfg.name || 'IndependentME') + ' test',
+          const names = body.person ? [body.person] : (cfg.contacts || []).map(p => p.name);
+          const sent = await notify(env, house, cfg, names, (cfg.name || 'IndependentME') + ' test',
             'If you can read this, notifications are working.', false);
+          if (!sent.length) return json({ error: 'Nobody has notifications set up yet', sent: [] }, 400);
           return json({ ok: true, sent });
         }
 

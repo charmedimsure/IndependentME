@@ -708,7 +708,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-21-v</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-21-w</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1218,7 +1218,7 @@ document.addEventListener('click',async e=>{
     CFG.keepDays=+document.getElementById('sKeep').value||0;
     await saveConfig(t); return;
   }
-  if(t.id==='saveMe'){ ME=document.getElementById('sMe').value; LS.set('me',ME); render(); return; }
+  if(t.id==='saveMe'){ ME=document.getElementById('sMe').value; LS.set('me',ME); subscribePush(); render(); return; }
   const ak=t.closest('[data-ack]');
   if(ak){ try{ await post('/ack',{id:+ak.dataset.ack, me:ME||'Someone'}); await pull(); }catch(e){ alert(e.message); } return; }
   if(t.id==='sWhole'){
@@ -1355,7 +1355,14 @@ document.addEventListener('click',async e=>{
     else alert('Use your browser menu, then Add to Home screen.');
     return;
   }
-  if(t.id==='askNotif'){ if('Notification' in window) Notification.requestPermission().then(p=>{ t.textContent = p==='granted'?'✓ Notifications are on':'Blocked in phone settings'; }); return; }
+  if(t.id==='askNotif'){
+    t.textContent='Turning on…';
+    const ok=await subscribePush();
+    t.textContent = ok ? '✓ Notifications are on'
+      : (Notification.permission==='denied' ? 'Blocked in phone settings'
+      : (!ME ? 'First, say which of you this is' : 'Could not turn on — try again'));
+    return;
+  }
 
   if(t.id==='ciAsk'){
     try{ await post('/checkin',{me:ME||'Someone'}); alert('Asked. She will see it on her tablet.'); }
@@ -1762,6 +1769,38 @@ function hangUp(){
 }
 
 if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+/* ---- Web Push subscription ----
+   Notifications come straight from the app through the browser's own push
+   service, so there's no second app to keep alive. Tied to which caregiver
+   this phone is, so re-subscribe if that changes. */
+const VAPID_PUBLIC='BHA-7JKE7UorEGzriIvV5M0SWXHf-xaddmBzuip7_GpVuMVc1eoXDPoKJAtUmYqNsT9hhvQBZqGUZrDowk1SByo';
+function _vapidBytes(b64){
+  const pad='='.repeat((4-b64.length%4)%4);
+  const s=(b64+pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw=atob(s); const out=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+async function subscribePush(){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    if(!ME || !API || !HOUSE || !CARE) return false;
+    if(Notification.permission==='denied') return false;
+    if(Notification.permission!=='granted'){
+      const p=await Notification.requestPermission();
+      if(p!=='granted') return false;
+    }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){
+      sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:_vapidBytes(VAPID_PUBLIC) });
+    }
+    await post('/subscribe', { person:ME, sub:sub.toJSON() });
+    LS.set('pushPerson', ME);
+    return true;
+  }catch(e){ return false; }
+}
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled',()=>{ document.getElementById('installbar').classList.add('hide'); });
@@ -1774,6 +1813,7 @@ function showInstallBar(){
 setTimeout(showInstallBar, 2500);   // also offer it where the prompt event never fires
 
 render(); pull();
+setTimeout(subscribePush, 1500);
 setInterval(()=>{ if(tab!=='setup' && !sub && !saving) pull(); }, 15000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden && !sub && !saving) pull(); });
 </script>
