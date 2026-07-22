@@ -118,13 +118,13 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 .installbar .go{background:#22201C;color:var(--amber);border-radius:12px;padding:11px 16px;font-weight:800;font-size:14px;flex:none}
 .installbar .x{background:transparent;color:#22201C;font-size:20px;padding:6px 4px;opacity:.55;flex:none}
 
-.ring{position:fixed;inset:0;z-index:75;background:#14161C;display:flex;flex-direction:column;
+.callring{position:fixed;inset:0;z-index:75;background:#14161C;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:20px;padding:28px;text-align:center}
-.ring .who{font-family:'Bricolage Grotesque',sans-serif;font-size:38px;font-weight:800;color:#EDEFF5}
-.ring .sub{color:#8E95A8;font-weight:700}
-.ring .btns{display:flex;gap:16px;margin-top:14px}
-.ring .ans{background:#3ECF7C;color:#08210F;border-radius:40px;padding:20px 34px;font-weight:800;font-size:19px}
-.ring .dec{background:#E8604C;color:#fff;border-radius:40px;padding:20px 34px;font-weight:800;font-size:19px}
+.callring .who{font-family:'Bricolage Grotesque',sans-serif;font-size:38px;font-weight:800;color:#EDEFF5}
+.callring .sub{color:#8E95A8;font-weight:700}
+.callring .btns{display:flex;gap:16px;margin-top:14px}
+.callring .ans{background:#3ECF7C;color:#08210F;border-radius:40px;padding:20px 34px;font-weight:800;font-size:19px}
+.callring .dec{background:#E8604C;color:#fff;border-radius:40px;padding:20px 34px;font-weight:800;font-size:19px}
 </style>
 </head>
 <body>
@@ -172,7 +172,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
   <button class="x" id="ibNo">✕</button>
 </div>
 <div class="lightbox hide" id="lightbox"></div>
-<div class="ring hide" id="ring"></div>
+<div class="callring hide" id="ring"></div>
 <div class="callwrap hide" id="callwrap"></div>
 <script>
 /* ============================================================
@@ -373,7 +373,10 @@ async function pull(){
     setConn(true);   // the main data is in; we're connected regardless of what follows
 
     // Karelynn ringing us
-    const call=MSGS.filter(m=>m.dir==='call' && !HANDLED_CALLS[m.id] && Date.now()-m.at < 120000).pop();
+    // Only ring for calls addressed to me (Karelynn calling this caregiver).
+    // A caregiver's call TO the tablet has who='__tablet__' and must not buzz
+    // the caller or the other caregivers.
+    const call=MSGS.filter(m=>m.dir==='call' && m.who===ME && !HANDLED_CALLS[m.id] && Date.now()-m.at < 120000).pop();
     if(call && !room && !incoming){
       const [rm,from]=String(call.body).split('|');
       incoming={id:call.id, room:rm, from:from||'Karelynn'};
@@ -709,7 +712,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-c</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-e</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>

@@ -537,7 +537,9 @@ async function sync(){
     if(fresh.length) announce(fresh[fresh.length-1]);
 
     // someone asking to see her, or ringing
-    const pending=MSGS.filter(m=>(m.dir==='ask'||m.dir==='call') && !HANDLED[m.id] && Date.now()-m.at < 180000);
+    // A call meant for the tablet has who='__tablet__' (or blank). Ignore the
+    // tablet's own outgoing calls, which are addressed to a caregiver name.
+    const pending=MSGS.filter(m=>(m.dir==='ask' || (m.dir==='call' && (!m.who || m.who==='__tablet__'))) && !HANDLED[m.id] && Date.now()-m.at < 180000);
     if(pending.length && !askMsg && !callRoom){
       const m=pending[pending.length-1];
       if(m.dir==='call'){
@@ -2007,7 +2009,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-c';
+const APP_VERSION='2026-07-22-e';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });

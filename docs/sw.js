@@ -7,7 +7,7 @@
    as the tablet has signal. The cache exists only so the app still
    opens when the wifi is down. */
 
-const VERSION = '2026-07-22-c';
+const VERSION = '2026-07-22-e';
 const CACHE   = 'independentme-' + VERSION;
 const SHELL   = ['./', './index.html', './care.html', './manifest.json', './manifest-care.json'];
 
