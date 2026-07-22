@@ -398,6 +398,7 @@ body[data-part="evening"] .stars i{background:rgba(255,255,255,.16)}
    Used anywhere an icon value starts with "svg:".
    ============================================================ */
 const SVGI = {
+  pad:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="10" width="20" height="44" rx="10"/><path d="M22 24c-8 0-10 6-4 10 6-4 4-10 4-10z"/><path d="M42 24c8 0 10 6 4 10-6-4-4-10-4-10z"/><path d="M32 18v28"/></svg>',
   can:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="10" width="24" height="44" rx="6"/><path d="M20 20h24M20 44h24"/><path d="M28 14h8"/></svg>',
   towel:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10h32a6 6 0 0 1 6 6v38a4 4 0 0 1-4 4H18a6 6 0 0 1-6-6V16a6 6 0 0 1 4-5.7z"/><path d="M16 10a6 6 0 0 0 0 12h8V10"/><path d="M22 32h20M22 40h20"/></svg>',
   sweater:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10h16l12 7-5 11-5-2.5V54H22V25.5L17 28l-5-11z"/><path d="M24 10c0 4.5 3.6 7 8 7s8-2.5 8-7"/><path d="M22 46h20"/></svg>',
@@ -859,6 +860,17 @@ function awayWindow(){
 const nowMins = () => { const d=new Date(); return d.getHours()*60+d.getMinutes(); };
 function awayNow(){ const w=awayWindow(); return !!w && nowMins()>=w.from && nowMins()<w.to; }
 
+/* Night quiet hours. Nothing fires between bedtime and wake-up, so she's
+   never woken by the tablet. The window wraps past midnight (e.g. 9:30pm to
+   7am), so we test "outside daytime" rather than a simple range. */
+function quietNow(){
+  const from = mins((CFG&&CFG.quietFrom) || '21:30');
+  const to   = mins((CFG&&CFG.quietTo)   || '07:00');
+  const n = nowMins();
+  return from > to ? (n >= from || n < to)   // wraps midnight
+                   : (n >= from && n < to);
+}
+
 /* Where a task actually lands today. Something set for noon on a day
    she's out belongs just after she gets home, not at noon. */
 function effTime(t){
@@ -906,6 +918,7 @@ function tellEvent(id){
    ============================================================ */
 const WARNED=new Set();
 function checkWarnings(){
+  if(quietNow()) return;
   if(awayNow()) return;
   if(alarmTask||timerTask||outfitTask||stepTask||askMsg||callRoom) return;
   const now=new Date(), nowM=now.getHours()*60+now.getMinutes();
@@ -996,7 +1009,9 @@ function finishSteps(){
     speak('You have seen all the steps. Leave the tablet here and go and '+t.name.toLowerCase()+'. Press the green button when you are finished.');
     return;
   }
-  closeSteps(); toggle(t.id);
+  closeSteps();
+  if(t && t.pad){ padDone(); return; }
+  toggle(t.id);
 }
 
 function closeSteps(){ document.getElementById('steps').classList.add('hide'); stepTask=null; }
@@ -1412,9 +1427,74 @@ const snoozeMins = () => (CFG && CFG.snoozeMinutes) || 10;
 const maxSnoozes = () => (CFG && CFG.maxSnoozes  != null) ? CFG.maxSnoozes : 3;
 const sKey = t => todayKey()+'|'+t.id;
 
+/* ============================================================
+   Period support
+
+   During her period she's reminded to change her pad every few hours,
+   only within waking hours, and walked through it the same calm way as
+   everything else. It reuses the normal alarm, so "not yet" and "I need
+   help" work exactly as she already knows. The wording stays plain and
+   private: nothing on a lock screen or a shared day-service tablet spells
+   it out.
+
+   We record the *time* of each change rather than ticking a box, because
+   it happens several times a day.
+   ============================================================ */
+function padCfg(){ return (CFG && CFG.period) || null; }
+
+function padTask(){
+  const pd=padCfg();
+  if(!pd) return null;
+  const steps=(pd.useSteps!==false) ? (pd.steps||[]) : [];
+  return { id:'__pad__', name:'Change your pad', icon:'svg:pad', time:'', pad:true, steps };
+}
+
+// The moment we last know she changed, as an epoch ms. Kept per day.
+function padLast(){ return LS.get('padLast', 0); }
+
+function padDueNow(){
+  const pd=padCfg();
+  if(!pd || !pd.active) return false;
+  if(awayNow() || quietNow()) return false;
+  const now=new Date();
+  const h=now.getHours()+now.getMinutes()/60;
+  const from=(pd.fromHour==null?8:pd.fromHour), to=(pd.toHour==null?21:pd.toHour);
+  if(h < from || h >= to) return false;
+
+  // honour "not yet" (same key the alarm's snooze writes to)
+  const sn=SNOOZE[todayKey()+'|__pad__'];
+  if(sn && sn.until > Date.now()) return false;
+
+  const every=(pd.everyHours||3)*3600000;
+  const last=padLast();
+  // If she hasn't changed since the window opened today, treat the window
+  // opening as the baseline so she gets one reminder near the start of the day.
+  const windowOpen=new Date(); windowOpen.setHours(from,0,0,0);
+  const base = last && last > windowOpen.getTime() ? last : windowOpen.getTime();
+  return (Date.now() - base) >= every;
+}
+
+function padDone(){
+  LS.set('padLast', Date.now());
+  const c=LS.get('padCount', {}); const k=todayKey();
+  c[k]=(c[k]||0)+1; LS.set('padCount', c);
+  SNOOZE[todayKey()+'|__pad__']={count:0, until:0}; LS.set('snooze', SNOOZE);
+  const el=document.getElementById('cheer');
+  if(el){
+    document.getElementById('cheerIcon').textContent='✓';
+    document.getElementById('cheerTitle').textContent='All clean';
+    document.getElementById('cheerText').textContent='Good job taking care of yourself.';
+    el.classList.remove('hide'); setTimeout(()=>el.classList.add('hide'),2600);
+  }
+  chime([660,880]);
+  speak('Good job taking care of yourself.');
+}
+
 function checkReminders(){
+  if(quietNow()) return;                                 // asleep, don't ring
   if(awayNow()) return;                                  // she isn't here
   if(alarmTask || timerTask || outfitTask || stepTask || askMsg || callRoom || pickingReward) return;   // one thing at a time
+  if(padDueNow()){ openAlarm(padTask()); return; }
   const nowM = new Date().getHours()*60 + new Date().getMinutes();
   const due = tasks().filter(dueToday)
     .filter(t=>!isDone(t))
@@ -1437,7 +1517,7 @@ async function openAlarm(t){
     <div class="apic">${t.photo?`<img src="${t.photo}" alt="">`:icoHTML(t.icon)}</div>
     <h2>Time to</h2>
     <div class="aname">${esc(t.name)}</div>
-    <div class="asub">${pretty(t.time)}</div>
+    <div class="asub">${t.pad?'When you can':pretty(t.time)}</div>
     <div class="abtns">
       ${(t.steps||[]).length
         ? `<button class="adid" id="aSteps" style="background:#2B4FD0">📋 &nbsp;Show me how</button>`
@@ -1461,7 +1541,10 @@ async function openAlarm(t){
 
   // backstop only, in case the tablet is on another screen
   if('Notification' in window && Notification.permission==='granted'){
-    try{ new Notification('Time to '+t.name.toLowerCase(),{body:'Open IndependentME',tag:sKey(t),requireInteraction:true}); }catch(e){}
+    try{
+      const nTitle = t.pad ? 'A reminder for you' : 'Time to '+t.name.toLowerCase();
+      new Notification(nTitle,{body:'Open IndependentME',tag:sKey(t),requireInteraction:true});
+    }catch(e){}
   }
 }
 
@@ -1482,6 +1565,7 @@ function closeAlarm(){
 function alarmDid(){
   const t = alarmTask;
   closeAlarm();
+  if(t && t.pad){ padDone(); return; }
   toggle(t.id);
 }
 
@@ -1497,7 +1581,9 @@ function alarmLater(){
   if(s.count >= 2){
     QUEUE.push({path:'/alert', body:{
       kind:'reminder',
-      text: t.name + ' put off ' + s.count + ' times (due ' + pretty(t.time) + ')'
+      text: t.pad
+        ? 'Pad change put off ' + s.count + ' times today'
+        : t.name + ' put off ' + s.count + ' times (due ' + pretty(t.time) + ')'
     }});
     LS.set('queue',QUEUE); flushQueue();
   }
@@ -1846,7 +1932,7 @@ if('serviceWorker' in navigator){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-21-r';
+const APP_VERSION='2026-07-21-v';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });

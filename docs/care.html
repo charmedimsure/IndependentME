@@ -182,6 +182,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
    Used anywhere an icon value starts with "svg:".
    ============================================================ */
 const SVGI = {
+  pad:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="22" y="10" width="20" height="44" rx="10"/><path d="M22 24c-8 0-10 6-4 10 6-4 4-10 4-10z"/><path d="M42 24c8 0 10 6 4 10-6-4-4-10-4-10z"/><path d="M32 18v28"/></svg>',
   can:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><rect x="20" y="10" width="24" height="44" rx="6"/><path d="M20 20h24M20 44h24"/><path d="M28 14h8"/></svg>',
   towel:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 10h32a6 6 0 0 1 6 6v38a4 4 0 0 1-4 4H18a6 6 0 0 1-6-6V16a6 6 0 0 1 4-5.7z"/><path d="M16 10a6 6 0 0 0 0 12h8V10"/><path d="M22 32h20M22 40h20"/></svg>',
   sweater:'<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M24 10h16l12 7-5 11-5-2.5V54H22V25.5L17 28l-5-11z"/><path d="M24 10c0 4.5 3.6 7 8 7s8-2.5 8-7"/><path d="M22 46h20"/></svg>',
@@ -214,7 +215,10 @@ let API=LS.get('api',''), HOUSE=LS.get('house',''), CARE=LS.get('care',''), ME=L
   history.replaceState(null,'',location.pathname);
 })();
 let CFG=LS.get('config',null), DONE=[], MSGS=[], WEEK=[], PHOTOS=[];
+let draftReply='';
+let pendingRender=false;
 let online=false, tab='today', lastCount=0;
+let sub=null, room=null;
 let HANDLED_CALLS=LS.get('handledCalls',{}), incoming=null;
 let savedAt=LS.get('savedAt',0), saving=false, TIDY=false;
 let loaded=false;   // true once we've actually seen the household's setup
@@ -250,7 +254,16 @@ const dueOn=(t,dow)=>t.freq==='daily'||(t.days||[]).includes(dow);
 let blankIds={};
 const blank=()=>({
   name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8, keepDays:30, showWholeDay:false,
+  quietFrom:'21:30', quietTo:'07:00',
   rewardOn:true, rewardNeed:0, weekNeedDays:7,
+  period:{ active:false, startedOn:null, log:[], everyHours:3, fromHour:8, toHour:21, useSteps:true,
+    steps:[
+      {id:uid(),icon:'🚽',       label:'Go to the bathroom'},
+      {id:uid(),icon:'svg:pad',  label:'Take off the old pad'},
+      {id:uid(),icon:'🗑️',       label:'Wrap it up and put it in the trash'},
+      {id:uid(),icon:'svg:pad',  label:'Put a fresh pad on'},
+      {id:uid(),icon:'🧼',       label:'Wash your hands'}
+    ]},
   rewards:[
     {id:uid(),name:'Orange Crush',  icon:'svg:can',photo:null,ok:true,tier:'day'},
     {id:uid(),name:'Kit Kat',       icon:'🍫',photo:null,ok:true,tier:'day'},
@@ -355,20 +368,22 @@ async function pull(){
 
     DONE=d.done||[]; PHOTOS=d.photos||[];
     const prev=MSGS.filter(m=>m.dir==='out').length;
-    MSGS=d.messages||[];
+    MSGS=d.messages||MSGS;
+    setConn(true);   // the main data is in; we're connected regardless of what follows
 
     // Karelynn ringing us
     const call=MSGS.filter(m=>m.dir==='call' && !HANDLED_CALLS[m.id] && Date.now()-m.at < 120000).pop();
     if(call && !room && !incoming){
       const [rm,from]=String(call.body).split('|');
       incoming={id:call.id, room:rm, from:from||'Karelynn'};
-      document.getElementById('ring').innerHTML=
+      const ringEl=document.getElementById('ring');
+      if(ringEl) ringEl.innerHTML=
         `<div style="font-size:64px">📹</div>
          <div class="who">${esc(incoming.from)}</div>
          <div class="sub">is calling you</div>
          <div class="btns"><button class="dec" id="ringNo">Decline</button>
          <button class="ans" id="ringYes">Answer</button></div>`;
-      document.getElementById('ring').classList.remove('hide');
+      if(ringEl) ringEl.classList.remove('hide');
       if('Notification' in window && Notification.permission==='granted'){
         try{ new Notification(incoming.from+' is calling',{body:'Open Care to answer',tag:'call'+call.id}); }catch(e){}
       }
@@ -378,10 +393,12 @@ async function pull(){
     if(now>prev && lastCount>0) ping();
     lastCount=now;
 
-    const from=new Date(); from.setDate(from.getDate()-6);
-    const w=await fetch(base+'/week?house='+encodeURIComponent(HOUSE)+'&from='+key(from));
-    WEEK=(await w.json()).log||[];
-    setConn(true);
+    // The weekly log is a nice-to-have. If it fails, stay connected.
+    try{
+      const from=new Date(); from.setDate(from.getDate()-6);
+      const w=await fetch(base+'/week?house='+encodeURIComponent(HOUSE)+'&from='+key(from));
+      if(w.ok) WEEK=(await w.json()).log||WEEK;
+    }catch(_){}
   }catch(e){ setConn(false); }
   render();
 }
@@ -635,6 +652,15 @@ function secBody(){
     <div class="row"><button class="chip" id="sWhole" aria-pressed="${!!(CFG&&CFG.showWholeDay)}">${(CFG&&CFG.showWholeDay)?'The whole day at once':'Only what it is time for'}</button></div>
     <p class="note" style="margin-top:10px">By default a task appears when its time arrives, not before. The arc across the top of her screen still shows the whole day as dots, so she can see what is coming without being handed a button she should not press yet.</p>
     <button class="btn" style="margin-top:14px" id="saveWhole">Save</button>
+  </div><div class="panel"><h3>Quiet hours</h3>
+    <p class="note" style="margin-bottom:12px">Nothing rings between these times, so the tablet never wakes her. Reminders wait for morning.</p>
+    <div class="row">
+      <div style="flex:1"><label class="f">Bedtime</label>
+        <input type="time" id="sQuietFrom" value="${(CFG&&CFG.quietFrom)||'21:30'}"></div>
+      <div style="flex:1"><label class="f">Wake up</label>
+        <input type="time" id="sQuietTo" value="${(CFG&&CFG.quietTo)||'07:00'}"></div>
+    </div>
+    <button class="btn" style="margin-top:16px" id="saveQuiet">Save</button>
   </div><div class="panel"><h3>Her name</h3>
     <input id="sName" value="${esc((CFG&&CFG.name)||'')}" placeholder="Karelynn">
     <label class="f">How fast she's spoken to</label>
@@ -682,7 +708,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-21-n</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-21-v</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -722,6 +748,52 @@ function secBody(){
     <button class="btn ghost" style="margin-top:14px" id="pushLocal">Upload this phone's copy instead</button>
     <p class="note" style="margin-top:10px">Use this if your phone still shows the right setup but the server does not.</p>
   </div>`;
+    case 'period': return (()=>{
+      const pd=(CFG&&CFG.period)||{};
+      const log=(pd.log||[]).slice().sort();
+      let predicted='';
+      if(log.length>=2){
+        let gaps=0; for(let i=1;i<log.length;i++){ gaps += (new Date(log[i])-new Date(log[i-1]))/86400000; }
+        const avg=Math.round(gaps/(log.length-1));
+        const next=new Date(new Date(log[log.length-1]).getTime()+avg*86400000);
+        predicted='About every '+avg+' days. Next one around '+next.toLocaleDateString(undefined,{month:'short',day:'numeric'})+'.';
+      } else if(pd.startedOn){
+        const next=new Date(new Date(pd.startedOn).getTime()+28*86400000);
+        predicted='Not enough history to predict yet. If it runs about 28 days, next one around '+next.toLocaleDateString(undefined,{month:'short',day:'numeric'})+'.';
+      }
+      const hrs=[['0','12am'],['6','6am'],['7','7am'],['8','8am'],['9','9am'],['20','8pm'],['21','9pm'],['22','10pm']];
+      return `<div class="panel">
+        <h3>Her period</h3>
+        <div class="row"><button class="chip" id="sPerActive" aria-pressed="${!!pd.active}" style="${pd.active?'background:var(--miss);color:#fff':''}">${pd.active?'On right now':'Off'}</button></div>
+        <p class="note" style="margin-top:10px">${pd.active
+          ? 'Reminders to change her pad are on.'+(pd.startedOn?' Started '+new Date(pd.startedOn).toLocaleDateString(undefined,{month:'short',day:'numeric'})+'.':'')
+          : 'Turn this on when her period starts. Turn it off when it ends. The start date is remembered so it can learn her cycle.'}</p>
+        ${predicted?`<p class="note" style="margin-top:6px">${predicted}</p>`:''}
+      </div>
+
+      <div class="panel">
+        <h3>How often</h3>
+        <label class="f">Remind her to change every</label>
+        <select id="sPerEvery">
+          ${[2,3,4].map(n=>`<option value="${n}" ${(pd.everyHours||3)===n?'selected':''}>${n} hours</option>`).join('')}
+        </select>
+        <label class="f">Only between</label>
+        <div class="row">
+          <select id="sPerFrom">${hrs.map(([v,l])=>`<option value="${v}" ${String(pd.fromHour??8)===v?'selected':''}>${l}</option>`).join('')}</select>
+          <select id="sPerTo">${hrs.map(([v,l])=>`<option value="${v}" ${String(pd.toHour??21)===v?'selected':''}>${l}</option>`).join('')}</select>
+        </div>
+        <p class="note" style="margin-top:8px">She won't be woken at night. The reminder waits inside these hours.</p>
+        <div class="row" style="margin-top:14px"><button class="chip" id="sPerSteps" aria-pressed="${pd.useSteps!==false}">${pd.useSteps!==false?'Walk her through the steps':'Just remind, no steps'}</button></div>
+        <button class="btn" style="margin-top:16px" id="savePeriod">Save</button>
+      </div>
+
+      <div class="panel">
+        <h3>The steps she sees</h3>
+        ${(pd.steps||[]).map(st=>`<div class="trow"><div class="tico">${st.photo?`<img src="${st.photo}">`:icoHTML(st.icon)}</div>
+          <div class="tmain"><div class="tname">${esc(st.label)}</div></div></div>`).join('') || '<div class="empty">No steps set.</div>'}
+        <p class="note" style="margin-top:12px">On her screen this reads plainly and is spoken to her. Nothing on the lock screen or the day-service tablet spells it out, so it stays private.</p>
+      </div>`;
+    })();
     default: return '';
   }
 }
@@ -748,7 +820,7 @@ function anyEditorOpen(){
 /* Her plan: the things that get adjusted week to week. */
 function viewPlan(){
   if(anyEditorOpen()) return;
-  sectionShell('Her plan', `<button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="day"><div style="font-size:26px;width:34px;flex:none">✓</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Things she does</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Tasks, times, steps, timers</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="plan"><div style="font-size:26px;width:34px;flex:none">📅</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">What’s happening</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Day service, appointments, visitors</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="say"><div style="font-size:26px;width:34px;flex:none">💬</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Things she can say</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">The picture messages</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="rewards"><div style="font-size:26px;width:34px;flex:none">🎁</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Rewards</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">What she works toward, and what’s in stock</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="clothes"><div style="font-size:26px;width:34px;flex:none">👕</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Clothes and weather</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">What to wear, and where you are</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="gentle"><div style="font-size:26px;width:34px;flex:none">🔔</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Reminders and voice</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">How firm, how fast, what she sees</div></div><div style="color:var(--soft);font-size:20px">›</div></button>`);
+  sectionShell('Her plan', `<button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="day"><div style="font-size:26px;width:34px;flex:none">✓</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Things she does</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Tasks, times, steps, timers</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="plan"><div style="font-size:26px;width:34px;flex:none">📅</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">What’s happening</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Day service, appointments, visitors</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="say"><div style="font-size:26px;width:34px;flex:none">💬</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Things she can say</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">The picture messages</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="rewards"><div style="font-size:26px;width:34px;flex:none">🎁</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Rewards</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">What she works toward, and what’s in stock</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="clothes"><div style="font-size:26px;width:34px;flex:none">👕</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Clothes and weather</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">What to wear, and where you are</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="gentle"><div style="font-size:26px;width:34px;flex:none">🔔</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Reminders and voice</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">How firm, how fast, what she sees</div></div><div style="color:var(--soft);font-size:20px">›</div></button><button class="panel" style="display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px" data-sec="period"><div style="font-size:26px;width:34px;flex:none">🩸</div><div style="flex:1"><div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:18px">Period support</div><div style="font-size:12.5px;color:var(--soft);font-weight:600;margin-top:2px">Pad-change reminders during her period</div></div><div style="color:var(--soft);font-size:20px">›</div></button>`);
 }
 
 /* Setup: joining this phone to the household, and the wiring behind it.
@@ -1387,6 +1459,39 @@ document.addEventListener('click',async e=>{
     CFG=CFG||blank(); CFG.rewardOn=!CFG.rewardOn;
     t.setAttribute('aria-pressed',CFG.rewardOn); t.textContent=CFG.rewardOn?'On':'Off'; return;
   }
+  if(t.id==='sPerActive'){
+    CFG=CFG||blank(); CFG.period=CFG.period||{log:[],everyHours:3,fromHour:8,toHour:21,useSteps:true,steps:[]};
+    const pd=CFG.period;
+    pd.active=!pd.active;
+    if(pd.active){
+      const today=new Date().toISOString().slice(0,10);
+      pd.startedOn=today;
+      pd.log=pd.log||[];
+      if(!pd.log.includes(today)) pd.log.push(today);
+      pd.log=pd.log.slice(-24);   // keep two years of starts, no more
+    }
+    await saveConfig(); render(); return;
+  }
+  if(t.id==='sPerSteps'){
+    CFG=CFG||blank(); CFG.period=CFG.period||{};
+    CFG.period.useSteps = !(CFG.period.useSteps!==false);
+    t.setAttribute('aria-pressed', CFG.period.useSteps);
+    t.textContent = CFG.period.useSteps?'Walk her through the steps':'Just remind, no steps';
+    return;
+  }
+  if(t.id==='savePeriod'){
+    CFG=CFG||blank(); CFG.period=CFG.period||{};
+    CFG.period.everyHours=+document.getElementById('sPerEvery').value||3;
+    CFG.period.fromHour=+document.getElementById('sPerFrom').value;
+    CFG.period.toHour=+document.getElementById('sPerTo').value;
+    await saveConfig(t); return;
+  }
+  if(t.id==='saveQuiet'){
+    CFG=CFG||blank();
+    CFG.quietFrom=document.getElementById('sQuietFrom').value||'21:30';
+    CFG.quietTo=document.getElementById('sQuietTo').value||'07:00';
+    await saveConfig(t); return;
+  }
   if(t.id==='saveRew'){
     CFG=CFG||blank();
     CFG.rewardNeed=+document.getElementById('sRewNeed').value||0;
@@ -1589,7 +1694,7 @@ document.addEventListener('change',e=>{
 });
 
 /* ---------- video calling ---------- */
-let pc=null,localStream=null,room=null,side='a',since=0,poll=null;
+let pc=null,localStream=null,side='a',since=0,poll=null;
 async function sig(kind,payload){ try{ await post('/signal',{room,side,kind,payload:JSON.stringify(payload||null)}); }catch(e){} }
 
 function callShell(state){
