@@ -331,11 +331,12 @@ const blank=()=>({
 
     {id:uid(),icon:'❤️',text:'I love you.',                  kind:'nice',for:[]},
     {id:uid(),icon:'👋',text:'Hi! Thinking about you.',        kind:'nice',for:[]},
-    {id:uid(),icon:'🏆',text:"You're the best Dad.",           kind:'nice',for:['Dad']},
+    {id:uid(),icon:'🏆',text:"You're the best Dad.",           kind:'nice',for:[]},
     {id:uid(),icon:'🚗',text:"You're an excellent driver.",    kind:'nice',for:[]},
     {id:uid(),icon:'💪',text:'Dad is the strongest.',          kind:'nice',for:[]},
-    {id:uid(),icon:'💕',text:"You're the best sister.",        kind:'nice',for:['Nan','Shelby']},
-    {id:uid(),icon:'🍳',text:'Mom is excellent at making dinner.',kind:'nice',for:[]}
+    {id:uid(),icon:'💕',text:"You're the best sister.",        kind:'nice',for:[]},
+    {id:uid(),icon:'🍳',text:'Mom is excellent at making dinner.',kind:'nice',for:[]},
+    {id:uid(),icon:'😜',text:'Womp womo.',                      kind:'nice',for:[]}
   ]
 });
 
@@ -590,6 +591,8 @@ function secBody(){
       <button class="tstat s-wait" data-ephr="${p.id}">edit</button></div>`).join('')
       || '<div class="empty">No phrases yet.</div>'}
     <button class="btn ghost" style="margin-top:14px" data-ephr="new">+ Add a phrase</button>
+    <button class="btn ghost" style="margin-top:9px" id="restorePhrases">Add Karelynn's starter phrases</button>
+    <p class="note" style="margin-top:8px">Adds any of the built-in phrases that are missing, and leaves the ones you already have alone.</p>
   </div>`;
     case 'rewards': return `<div class="panel"><h3>Working toward something</h3>
     <div class="row"><button class="chip" id="sRewOn" aria-pressed="${!!(CFG&&CFG.rewardOn)}">${(CFG&&CFG.rewardOn)?'On':'Off'}</button></div>
@@ -712,7 +715,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-f</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-g</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1284,6 +1287,31 @@ document.addEventListener('click',async e=>{
   }
   const sc=t.closest('[data-sec]'); if(sc){ secKey=sc.dataset.sec; render(); return; }
   if(t.id==='secBack'){ secKey=null; render(); return; }
+  if(t.id==='restorePhrases'){
+    CFG=CFG||blank(); CFG.phrases=CFG.phrases||[];
+    const defs=[
+      {icon:'🆘',text:'I need help please.',              kind:'need',for:[]},
+      {icon:'🍽️',text:"I'm hungry.",                      kind:'need',for:[]},
+      {icon:'📞',text:'Can you call me?',                 kind:'need',for:[]},
+      {icon:'😴',text:"I'm tired.",                       kind:'need',for:[]},
+      {icon:'🤒',text:"I don't feel good.",               kind:'need',for:[]},
+      {icon:'✅',text:'I finished everything today!',      kind:'need',for:[]},
+      {icon:'❤️',text:'I love you.',                      kind:'nice',for:[]},
+      {icon:'👋',text:'Hi! Thinking about you.',          kind:'nice',for:[]},
+      {icon:'🏆',text:"You're the best Dad.",             kind:'nice',for:[]},
+      {icon:'🚗',text:"You're an excellent driver.",      kind:'nice',for:[]},
+      {icon:'💪',text:'Dad is the strongest.',            kind:'nice',for:[]},
+      {icon:'💕',text:"You're the best sister.",          kind:'nice',for:[]},
+      {icon:'🍳',text:'Mom is excellent at making dinner.',kind:'nice',for:[]},
+      {icon:'😜',text:'Womp womo.',                       kind:'nice',for:[]}
+    ];
+    const have=new Set(CFG.phrases.map(p=>String(p.text||'').trim().toLowerCase()));
+    let added=0;
+    defs.forEach(d=>{ if(!have.has(d.text.trim().toLowerCase())){ CFG.phrases.push({id:uid(),icon:d.icon,text:d.text,kind:d.kind,for:d.for}); added++; } });
+    if(added){ await saveConfig(); render(); toast('Added '+added+(added===1?' phrase':' phrases')); }
+    else toast('They are all already there');
+    return;
+  }
   if(t.id==='whoBack'){
     try{
       const r=await fetch(API.replace(/\/$/,'')+'/who?house='+encodeURIComponent(HOUSE));
