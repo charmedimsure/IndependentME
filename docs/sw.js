@@ -7,7 +7,7 @@
    as the tablet has signal. The cache exists only so the app still
    opens when the wifi is down. */
 
-const VERSION = '2026-07-21-z';
+const VERSION = '2026-07-22-b';
 const CACHE   = 'independentme-' + VERSION;
 const SHELL   = ['./', './index.html', './care.html', './manifest.json', './manifest-care.json'];
 
@@ -63,28 +63,49 @@ self.addEventListener('push', event => {
   try { if (event.data) data = event.data.json(); } catch (e) {
     try { data.body = event.data.text(); } catch (_) {}
   }
+  const isCall = data.kind === 'call';
   const title = data.title || 'IndependentME';
   const body  = data.body  || '';
-  event.waitUntil(
-    self.registration.showNotification(title, {
+
+  event.waitUntil((async () => {
+    // If a window is already open (even in the background), tell it to ring
+    // right away so the tablet doesn't just show a silent notification.
+    if (isCall) {
+      const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const c of wins) c.postMessage({ type: 'incoming-call', room: data.room, from: data.from });
+    }
+    await self.registration.showNotification(title, {
       body,
       icon: 'icon-care-192.png',
       badge: 'icon-care-192.png',
-      tag: 'ime-' + Date.now(),
+      tag: isCall ? 'ime-call' : 'ime-' + Date.now(),
       renotify: true,
-      vibrate: [120, 60, 120]
-    })
-  );
+      requireInteraction: isCall,               // a call stays up until answered
+      vibrate: isCall ? [300, 150, 300, 150, 300] : [120, 60, 120],
+      data: { kind: data.kind, room: data.room, from: data.from }
+    });
+  })());
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      for (const c of list) {
-        if (c.url.includes('care.html') && 'focus' in c) return c.focus();
+  const d = event.notification.data || {};
+  event.waitUntil((async () => {
+    const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
+    // A call opens the tablet app and rings; anything else opens the care app.
+    if (d.kind === 'call') {
+      for (const c of wins) {
+        if (!c.url.includes('care.html') && 'focus' in c) {
+          c.postMessage({ type: 'incoming-call', room: d.room, from: d.from });
+          return c.focus();
+        }
       }
-      if (clients.openWindow) return clients.openWindow('./care.html');
-    })
-  );
+      if (clients.openWindow) return clients.openWindow('./?call=' + encodeURIComponent(d.room || '') + '&from=' + encodeURIComponent(d.from || ''));
+      return;
+    }
+    for (const c of wins) {
+      if (c.url.includes('care.html') && 'focus' in c) return c.focus();
+    }
+    if (clients.openWindow) return clients.openWindow('./care.html');
+  })());
 });

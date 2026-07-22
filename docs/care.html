@@ -249,7 +249,8 @@ function effT(t){
   const w=awayWin(), m=mins(t.time);
   return (w&&m>=w.from&&m<w.to) ? w.to+5 : m;
 }
-const dueOn=(t,dow)=>t.freq==='daily'||(t.days||[]).includes(dow);
+const _todayISO=()=>new Date().toISOString().slice(0,10);
+const dueOn=(t,dow)=>t.freq==='daily'||(t.freq==='weekly'&&(t.days||[]).includes(dow))||(t.freq==='once'&&t.date && t.date<=_todayISO());
 
 let blankIds={};
 const blank=()=>({
@@ -468,7 +469,7 @@ function viewToday(){
       return `<div class="trow">
         <div class="tico">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
         <div class="tmain"><div class="tname">${esc(t.name)}</div>
-          <div class="tsub">${pretty(t.time)}${t.freq==='weekly'?' · weekly':''}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
+          <div class="tsub">${pretty(t.time)}${t.freq==='weekly'?' · weekly':t.freq==='once'?' · just once':''}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
         <div class="tstat ${at?'s-ok':isLate?'s-late':'s-wait'}">${at?'✓ '+clock(at):isLate?'past due':'waiting'}</div>
       </div>`;
     }).join('') : '<div class="empty">Nothing scheduled today.</div>'}
@@ -563,7 +564,7 @@ function secBody(){
     ${(CFG&&CFG.tasks||[]).slice().sort((a,b)=>mins(a.time)-mins(b.time)).map(t=>`
       <div class="trow"><div class="tico">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
       <div class="tmain"><div class="tname">${esc(t.name)}</div>
-        <div class="tsub">${t.freq==='daily'?'Every day':(t.days||[]).map(d=>D3[d]).join(', ')||'no days set'} · ${pretty(t.time)}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
+        <div class="tsub">${t.freq==='once'?('Just once'+(t.date?' · '+new Date(t.date+'T00:00').toLocaleDateString(undefined,{month:'short',day:'numeric'}):'')):t.freq==='daily'?'Every day':((t.days||[]).map(d=>D3[d]).join(', ')||'no days set')} · ${pretty(t.time)}${t.timer?' · ⏱ '+Math.round(t.timer/60)+'m':''}</div></div>
       <button class="tstat s-wait" data-etask="${t.id}">edit</button></div>`).join('')
       || '<div class="empty">No tasks yet.</div>'}
     <button class="btn ghost" style="margin-top:14px" data-etask="new">+ Add a task</button>
@@ -708,7 +709,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-21-z</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-b</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -857,10 +858,16 @@ function editTask(){
     <div class="row">
       <button class="chip" id="fD" aria-pressed="${t.freq==='daily'}">Every day</button>
       <button class="chip" id="fW" aria-pressed="${t.freq==='weekly'}">Certain days</button>
+      <button class="chip" id="fO" aria-pressed="${t.freq==='once'}">Just once</button>
     </div>
     <div id="dDays" class="${t.freq==='weekly'?'':'hide'}">
       <label class="f">Which days</label>
       <div class="row" style="gap:4px">${D3.map((d,i)=>`<button class="chip" style="padding:11px 2px" data-day="${i}" aria-pressed="${(t.days||[]).includes(i)}">${d[0]}</button>`).join('')}</div>
+    </div>
+    <div id="dOnce" class="${t.freq==='once'?'':'hide'}">
+      <label class="f">Which day</label>
+      <input type="date" id="dDate" value="${t.date||new Date().toISOString().slice(0,10)}">
+      <p class="note" style="margin-top:8px">Shows on that day and stays on her list until she does it, then it's gone. Good for one-off things like putting laundry away or tidying her room.</p>
     </div>
     <label class="f">What time</label>
     <input type="time" id="dTime" value="${t.time}">
@@ -1418,7 +1425,7 @@ document.addEventListener('click',async e=>{
   if(et){
     CFG=CFG||blank();
     draft = et.dataset.etask==='new'
-      ? {_new:true,id:uid(),name:'',icon:'🪥',photo:null,time:'08:00',freq:'daily',days:[],timer:0,outfit:false,rollover:false,warn:5,preview:false,steps:[]}
+      ? {_new:true,id:uid(),name:'',icon:'🪥',photo:null,time:'08:00',freq:'daily',days:[],date:null,timer:0,outfit:false,rollover:false,warn:5,preview:false,steps:[]}
       : Object.assign({},CFG.tasks.find(x=>x.id===et.dataset.etask));
     draft.steps=JSON.parse(JSON.stringify(draft.steps||[]));
     sub='task'; render(); return;
@@ -1587,8 +1594,9 @@ document.addEventListener('click',async e=>{
   }
   if(t.id==='dPhoto'){ document.getElementById('dFile').click(); return; }
   if(t.id==='dNoPhoto'){ draft.photo=null; document.getElementById('dPrev').innerHTML=draft.icon; return; }
-  if(t.id==='fD'){ draft.freq='daily'; document.getElementById('fD').setAttribute('aria-pressed',true); document.getElementById('fW').setAttribute('aria-pressed',false); document.getElementById('dDays').classList.add('hide'); return; }
-  if(t.id==='fW'){ draft.freq='weekly'; document.getElementById('fW').setAttribute('aria-pressed',true); document.getElementById('fD').setAttribute('aria-pressed',false); document.getElementById('dDays').classList.remove('hide'); return; }
+  if(t.id==='fD'){ draft.freq='daily'; ['fD','fW','fO'].forEach(x=>document.getElementById(x).setAttribute('aria-pressed', x==='fD')); document.getElementById('dDays').classList.add('hide'); document.getElementById('dOnce').classList.add('hide'); return; }
+  if(t.id==='fW'){ draft.freq='weekly'; ['fD','fW','fO'].forEach(x=>document.getElementById(x).setAttribute('aria-pressed', x==='fW')); document.getElementById('dDays').classList.remove('hide'); document.getElementById('dOnce').classList.add('hide'); return; }
+  if(t.id==='fO'){ draft.freq='once'; ['fD','fW','fO'].forEach(x=>document.getElementById(x).setAttribute('aria-pressed', x==='fO')); document.getElementById('dDays').classList.add('hide'); document.getElementById('dOnce').classList.remove('hide'); return; }
   const dy=t.closest('[data-day]');
   if(dy){
     draft.days=draft.days||[];
@@ -1605,9 +1613,11 @@ document.addEventListener('click',async e=>{
     if(sub==='task'){
       draft.name=val; draft.time=document.getElementById('dTime').value||'08:00';
       draft.timer=+document.getElementById('dTimer').value||0;
+      if(draft.freq==='once'){ const dv=document.getElementById('dDate'); draft.date=(dv&&dv.value)||new Date().toISOString().slice(0,10); }
       if(draft.freq!=='weekly') draft.days=[];
+      if(draft.freq!=='once') draft.date=null;
       const list=CFG.tasks, i=list.findIndex(x=>x.id===draft.id);
-      const rec={id:draft.id,name:draft.name,icon:draft.icon,photo:draft.photo,time:draft.time,freq:draft.freq,days:draft.days,timer:draft.timer||0,outfit:!!draft.outfit,rollover:!!draft.rollover,
+      const rec={id:draft.id,name:draft.name,icon:draft.icon,photo:draft.photo,time:draft.time,freq:draft.freq,days:draft.days,date:draft.date||null,timer:draft.timer||0,outfit:!!draft.outfit,rollover:!!draft.rollover,
         warn:+document.getElementById('dWarn').value,preview:!!draft.preview,steps:draft.steps||[]};
       if(i>-1) list[i]=rec; else list.push(rec);
     }
@@ -1735,7 +1745,7 @@ async function startCall(rm, sd){
   if(side==='a'){
     const offer=await pc.createOffer(); await pc.setLocalDescription(offer);
     await sig('offer',offer);
-    await post('/call',{room,from:ME||'Someone',to:''}).catch(()=>{});
+    await post('/call',{room,from:ME||'Someone',to:'__tablet__'}).catch(()=>{});
   }
   poll=setInterval(async()=>{
     if(!room||!pc) return;

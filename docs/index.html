@@ -437,12 +437,21 @@ const mins = t => { const [h,m]=t.split(':').map(Number); return h*60+m; };
 const pretty = t => { let [h,m]=t.split(':').map(Number); const ap=h<12?'am':'pm'; h=h%12||12; return h+':'+String(m).padStart(2,'0')+ap; };
 const partOf = m => m<720?'morning':m<1020?'afternoon':'evening';
 const tasks = () => (CFG&&CFG.tasks)||[];
-const isDone = t => (DONE[todayKey()]||[]).includes(t.id);
+const everDone = t => (RECENT.some(r=>r.task_id===t.id)) ||
+  Object.keys(DONE).some(day => (DONE[day]||[]).includes(t.id));
+const isDone = t => t.freq==='once' ? everDone(t) : (DONE[todayKey()]||[]).includes(t.id);
 const dayKeyOf = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 
 /* A weekly task that got missed shouldn't quietly vanish for six days. If it's
    set to carry forward, it stays on the list until it's actually done. */
 function carriedOver(t){
+  if(t.freq==='once'){
+    if(!t.date || everDone(t)) return false;
+    const today=todayKey();
+    if(t.date >= today) return false;                 // today/future handled elsewhere
+    const age=(new Date(today)-new Date(t.date))/86400000;
+    return age<=14;                                   // stops nagging after two weeks
+  }
   if(t.freq!=='weekly' || !t.rollover) return false;
   const days=t.days||[]; if(!days.length) return false;
   for(let back=1; back<=7; back++){
@@ -454,7 +463,7 @@ function carriedOver(t){
   }
   return false;
 }
-const dueToday = t => t.freq==='daily' || (t.days||[]).includes(new Date().getDay()) || carriedOver(t);
+const dueToday = t => t.freq==='daily' || (t.freq==='weekly' && (t.days||[]).includes(new Date().getDay())) || (t.freq==='once' && t.date===todayKey()) || carriedOver(t);
 
 /* ---------- voice and chime ---------- */
 function speak(text){
@@ -611,7 +620,7 @@ function renderHome(){
      its time. A weekly that was actually missed on an earlier day floats as
      available on the days after, so it isn't lost. The care app can switch
      all this off with "show the whole day at once". */
-  const scheduledToday = t => t.freq==='daily' || (t.days||[]).includes(now.getDay());
+  const scheduledToday = t => t.freq==='daily' || (t.freq==='weekly' && (t.days||[]).includes(now.getDay())) || (t.freq==='once' && t.date===todayKey());
   const showAll = CFG && CFG.showWholeDay;
   const ready = t => showAll || (scheduledToday(t) ? effTime(t) <= nowM : carriedOver(t));
   const open  = list.filter(t=>!isDone(t) && ready(t));
@@ -658,7 +667,7 @@ function cardHTML(t,due,i,finished){
     <div class="pic">${t.photo?`<img src="${t.photo}" alt="">`:icoHTML(t.icon)}</div>
     <div class="cbody">
       <div class="cname">${esc(t.name)}</div>
-      <div class="cwhen">${carriedOver(t)?'Still to do · ':t.freq==='weekly'?'This week · ':''}${effTime(t)!==mins(t.time)?'when you get home':pretty(t.time)}${t.timer?' · '+Math.round(t.timer/60)+' min':''}</div>
+      <div class="cwhen">${carriedOver(t)?'Still to do · ':t.freq==='once'?'Just for today · ':t.freq==='weekly'?'This week · ':''}${effTime(t)!==mins(t.time)?'when you get home':pretty(t.time)}${t.timer?' · '+Math.round(t.timer/60)+' min':''}</div>
       <div class="crow">
         <button class="mini" data-speak="${esc(t.name)}" aria-label="Read out loud">🔊</button>
         ${(timed||dress||stepped)?`<button class="mini" data-toggle="${t.id}" aria-label="Already did this">✓</button>`:''}
@@ -1887,8 +1896,10 @@ document.addEventListener('click', e=>{
     return;
   }
   if(t.id==='askNotif'){
-    if('Notification' in window) Notification.requestPermission().then(p=>{
-      t.textContent = p==='granted' ? '✓ Notifications are on' : 'Blocked in tablet settings';
+    t.textContent='Turning on…';
+    subscribeTabletPush().then(ok=>{
+      t.textContent = ok ? '✓ Notifications are on'
+        : (Notification.permission==='denied' ? 'Blocked in tablet settings' : 'Could not turn on');
     });
     return;
   }
@@ -1938,13 +1949,54 @@ document.addEventListener('click', e=>{
   });
 })();
 
-/* Service worker: makes the app installable and keeps it opening offline. */
+/* Service worker: makes the app installable, keeps it opening offline, and
+   receives call pushes that wake the tablet. */
 if('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
+  // When a call push arrives while the app is open (even in the background),
+  // the service worker tells us to ring right away.
+  navigator.serviceWorker.addEventListener('message', ev=>{
+    const d=ev.data||{};
+    if(d.type==='incoming-call' && !callRoom && !askMsg){
+      showIncomingCall({ id:d.id||('c'+Date.now()), who:d.from||'Someone', room:d.room });
+    }
+  });
+}
+
+/* ---- Web Push for the tablet ----
+   Lets a caregiver's call wake the tablet and ring even when the screen is
+   off and the app is closed. Subscribes under a fixed name so the worker
+   knows which device is Karelynn's. */
+const VAPID_PUBLIC='BHA-7JKE7UorEGzriIvV5M0SWXHf-xaddmBzuip7_GpVuMVc1eoXDPoKJAtUmYqNsT9hhvQBZqGUZrDowk1SByo';
+function _vapidBytes(b64){
+  const pad='='.repeat((4-b64.length%4)%4);
+  const raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));
+  const out=new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+async function subscribeTabletPush(){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
+    if(!API || !HOUSE) return false;
+    if(Notification.permission==='denied') return false;
+    if(Notification.permission!=='granted'){
+      const perm=await Notification.requestPermission();
+      if(perm!=='granted') return false;
+    }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey:_vapidBytes(VAPID_PUBLIC) });
+    await fetch(API.replace(/\/$/,'')+'/subscribe',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ house:HOUSE, care:'__tablet__', person:'__tablet__', sub:sub.toJSON() })
+    });
+    return true;
+  }catch(e){ return false; }
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-21-z';
+const APP_VERSION='2026-07-22-b';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
@@ -1998,6 +2050,18 @@ setInterval(sync,25000);
 setInterval(()=>{ renderHome(); checkWarnings(); checkReminders(); },15000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ sync(); checkReminders(); } });
 setTimeout(checkReminders, 2500);
+setTimeout(subscribeTabletPush, 2000);
+(function(){
+  const q=new URLSearchParams(location.search);
+  const room=q.get('call');
+  if(room){
+    const from=q.get('from')||'Someone';
+    const ring=()=>{ if(!callRoom && !askMsg) showIncomingCall({id:'c'+Date.now(), who:from, room}); };
+    // wait until CFG is available so the caller's photo/name resolve
+    let tries=0; const iv=setInterval(()=>{ if(CFG||tries++>20){ clearInterval(iv); ring(); } }, 300);
+    history.replaceState(null,'',location.pathname);
+  }
+})();
 </script>
 </body>
 </html>
