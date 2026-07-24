@@ -135,10 +135,10 @@ async function _encryptPush(plaintext, p256dhB64, authB64){
   const head = _cat(salt, new Uint8Array([0,0,0x10,0]), new Uint8Array([asPub.length]), asPub);
   return _cat(head, ct);
 }
-async function webPushOne(env, sub, title, body){
+async function webPushOne(env, sub, title, body, extra){
   try{
     if(!env || !env.VAPID_PRIVATE) return { status:0, error:'no VAPID_PRIVATE set' };
-    const payload = JSON.stringify({ title, body });
+    const payload = JSON.stringify(Object.assign({ title, body }, extra||{}));
     const enc = await _encryptPush(payload, sub.p256dh, sub.auth);
     const jwt = await _vapidJWT(sub.endpoint, env.VAPID_PRIVATE, 'mailto:care@independentme.app');
     const r = await fetch(sub.endpoint, {
@@ -155,6 +155,19 @@ async function webPushOne(env, sub, title, body){
   }catch(e){ return { status:0, error:String(e&&e.message||e) }; }
 }
 
+// Push the tablet so a caregiver's call wakes it and rings.
+async function ringTablet(env, house, cfg, room, from){
+  const subs = await webSubsFor(env, house, '__tablet__');
+  for(const sub of subs){
+    const r = await webPushOne(env, sub, (from||'Someone')+' is calling', 'Tap to answer',
+      { kind:'call', room, from: from||'Someone' });
+    if(r.status === 410 || r.status === 404){
+      await env.DB.prepare('DELETE FROM push_subs WHERE code = ? AND endpoint = ?').bind(house, sub.endpoint).run();
+    }
+  }
+  return subs.length;
+}
+
 // Web subscriptions stored for a given caregiver name.
 async function webSubsFor(env, house, name){
   const rows = await env.DB.prepare('SELECT person, endpoint, p256dh, auth FROM push_subs WHERE code = ? AND person = ?')
@@ -166,8 +179,11 @@ async function webSubsFor(env, house, name){
 function namesFor(cfg, who){
   const people = cfg.contacts || [];
   if(!who) return people.map(p => p.name);
+  if(who === '__tablet__') return [];          // the tablet is pushed separately
   const one = people.find(p => p.name === who || p.id === who);
-  return one ? [one.name] : people.map(p => p.name);
+  // An unknown target must not fan out to the whole family; better to notify
+  // nobody than to ring four phones for a call meant for one person.
+  return one ? [one.name] : [];
 }
 
 /* Notify people by name. Web Push if they have a subscription, otherwise
@@ -394,7 +410,22 @@ export default {
             'INSERT INTO messages (code, dir, who, body, icon, at, seen, escalated) VALUES (?, ?, ?, ?, ?, ?, 0, 1)'
           ).bind(house, 'call', to || '', room + '|' + (from || ''), '\u{1F4F9}', Date.now()).run();
           const cfg = await loadConfig(env, house);
-          if (to) await notify(env, house, cfg, namesFor(cfg, to), cfg.name || 'IndependentME', (from || 'Someone') + ' is calling', true);
+          if (to === '__tablet__' || !to) {
+            await ringTablet(env, house, cfg, room, from);
+          } else {
+            await notify(env, house, cfg, namesFor(cfg, to), cfg.name || 'IndependentME', (from || 'Someone') + ' is calling', true);
+          }
+          return json({ ok: true });
+        }
+
+        /* ---------- caller gave up: stop the other end ringing ---------- */
+        case '/call-cancel': {
+          if (!body.room) return json({ error: 'Missing room' }, 400);
+          // The ring is driven by the stored call row, so removing it stops
+          // the other device ringing on its next refresh.
+          await env.DB.prepare(
+            "DELETE FROM messages WHERE code = ? AND dir = 'call' AND body LIKE ?"
+          ).bind(house, body.room + '|%').run();
           return json({ ok: true });
         }
 
@@ -416,8 +447,10 @@ export default {
         /* ---------- prove notifications work ---------- */
         /* ---------- the browser hands us its push subscription ---------- */
         case '/subscribe': {
-          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
           const { person, sub } = body;
+          // The tablet has no caregiver key by design; it may only register
+          // itself to RECEIVE call pushes. Everyone else needs the key.
+          if (person !== '__tablet__' && !await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
           if (!person || !sub || !sub.endpoint || !sub.keys) return json({ error: 'Bad subscription' }, 400);
           await env.DB.prepare(
             `INSERT INTO push_subs (code, person, endpoint, p256dh, auth, updated)

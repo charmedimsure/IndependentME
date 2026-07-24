@@ -377,7 +377,12 @@ async function pull(){
     // Only ring for calls addressed to me (Karelynn calling this caregiver).
     // A caregiver's call TO the tablet has who='__tablet__' and must not buzz
     // the caller or the other caregivers.
-    const call=MSGS.filter(m=>m.dir==='call' && m.who===ME && !HANDLED_CALLS[m.id] && Date.now()-m.at < 120000).pop();
+    // If the caller hung up, their call row is gone, so stop ringing.
+    if(incoming && !MSGS.some(m=>m.id===incoming.id)){
+      incoming=null;
+      const rEl=document.getElementById('ring'); if(rEl) rEl.classList.add('hide');
+    }
+    const call=MSGS.filter(m=>m.dir==='call' && m.who===ME && !HANDLED_CALLS[m.id] && Date.now()-m.at < 60000).pop();
     if(call && !room && !incoming){
       const [rm,from]=String(call.body).split('|');
       incoming={id:call.id, room:rm, from:from||'Karelynn'};
@@ -715,7 +720,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-g</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-i</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1801,7 +1806,7 @@ async function startCall(rm, sd){
 }
 
 function hangUp(){
-  if(room) sig('end',null);
+  if(room){ sig('end',null); post('/call-cancel',{room}).catch(()=>{}); }
   clearInterval(poll); poll=null;
   if(pc){ try{pc.close();}catch(e){} pc=null; }
   if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }

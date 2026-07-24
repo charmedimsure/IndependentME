@@ -378,6 +378,8 @@ body[data-part="evening"] .stars i{background:rgba(255,255,255,.16)}
     <button class="btn ghost" style="margin-top:12px" id="testVoice">🔊 Test the voice</button>
     <p class="note" style="margin-top:8px" id="voiceState"></p>
     <button class="btn ghost" style="margin-top:16px" id="askNotif">Turn on notifications</button>
+    <button class="btn ghost" style="margin-top:10px" id="awakeBtn">Keep the screen awake</button>
+    <p class="note" style="margin-top:8px">Best when the tablet is on a charger. Keeps this app on screen so a video call rings in front of her instead of only as a notification.</p>
     <button class="btn" style="margin-top:12px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="diag">Check what's working</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
@@ -539,7 +541,9 @@ async function sync(){
     // someone asking to see her, or ringing
     // A call meant for the tablet has who='__tablet__' (or blank). Ignore the
     // tablet's own outgoing calls, which are addressed to a caregiver name.
-    const pending=MSGS.filter(m=>(m.dir==='ask' || (m.dir==='call' && (!m.who || m.who==='__tablet__'))) && !HANDLED[m.id] && Date.now()-m.at < 180000);
+    // Caller hung up before she answered: their call row is gone, so stop.
+    if(askMsg && askMsg.room && !MSGS.some(m=>m.id===askMsg.id)){ closeAsk(); }
+    const pending=MSGS.filter(m=>(m.dir==='ask' || (m.dir==='call' && (!m.who || m.who==='__tablet__'))) && !HANDLED[m.id] && Date.now()-m.at < 60000);
     if(pending.length && !askMsg && !callRoom){
       const m=pending[pending.length-1];
       if(m.dir==='call'){
@@ -1202,7 +1206,7 @@ async function pollSignal(){
 }
 
 function endCall(){
-  if(callRoom) sig('end',null);
+  if(callRoom){ sig('end',null); QUEUE.push({path:'/call-cancel',body:{room:callRoom}}); LS.set('queue',QUEUE); flushQueue(); }
   clearInterval(sigPoll); sigPoll=null;
   if(pc){ try{pc.close();}catch(e){} pc=null; }
   if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
@@ -1908,6 +1912,14 @@ document.addEventListener('click', e=>{
     else alert('Chrome has not offered the install prompt yet.\n\nUse the Chrome menu (three dots), then "Install app" or "Add to Home screen".\n\nIf that is missing, tap "Check what\'s working" below and tell Aimee what it says.');
     return;
   }
+  if(t.id==='awakeBtn'){
+    const want=!LS.get('awake',false);
+    keepAwake(want).then(ok=>{
+      t.textContent = (want&&ok) ? '✓ Screen stays awake' : 'Keep the screen awake';
+      if(want&&!ok) alert('This tablet does not support keeping the screen awake from the browser.\n\nInstead: Settings, Display, Screen timeout, and set it to a long time or Never while charging.');
+    });
+    return;
+  }
   if(t.id==='askNotif'){
     t.textContent='Turning on…';
     subscribeTabletPush().then(ok=>{
@@ -1988,6 +2000,30 @@ function _vapidBytes(b64){
   for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
   return out;
 }
+/* Keeping the tablet awake matters more than it sounds: a browser cannot open
+   a full-screen call window when the app is closed, so the surest way for
+   Karelynn to SEE a call is for the app to already be on screen. Best on a
+   charger. */
+let stayLock=null;
+async function keepAwake(on){
+  try{
+    if(on){
+      if(!('wakeLock' in navigator)) return false;
+      stayLock = await navigator.wakeLock.request('screen');
+      stayLock.addEventListener('release', ()=>{ stayLock=null; });
+      LS.set('awake', true);
+      return true;
+    }
+    if(stayLock){ await stayLock.release(); stayLock=null; }
+    LS.set('awake', false);
+    return false;
+  }catch(e){ return false; }
+}
+// Re-acquire after the screen sleeps or the tab is backgrounded
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && LS.get('awake',false) && !stayLock) keepAwake(true);
+});
+
 async function subscribeTabletPush(){
   try{
     if(!('serviceWorker' in navigator) || !('PushManager' in window)) return false;
@@ -2009,7 +2045,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-g';
+const APP_VERSION='2026-07-22-i';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
@@ -2064,6 +2100,7 @@ setInterval(()=>{ renderHome(); checkWarnings(); checkReminders(); },15000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ sync(); checkReminders(); } });
 setTimeout(checkReminders, 2500);
 setTimeout(subscribeTabletPush, 2000);
+if(LS.get('awake',false)) setTimeout(()=>keepAwake(true), 2500);
 (function(){
   const q=new URLSearchParams(location.search);
   const room=q.get('call');

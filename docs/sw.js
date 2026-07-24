@@ -7,7 +7,7 @@
    as the tablet has signal. The cache exists only so the app still
    opens when the wifi is down. */
 
-const VERSION = '2026-07-22-g';
+const VERSION = '2026-07-22-i';
 const CACHE   = 'independentme-' + VERSION;
 const SHELL   = ['./', './index.html', './care.html', './manifest.json', './manifest-care.json'];
 
@@ -76,12 +76,18 @@ self.addEventListener('push', event => {
     }
     await self.registration.showNotification(title, {
       body,
-      icon: 'icon-care-192.png',
+      icon: isCall ? 'icon-192.png' : 'icon-care-192.png',
       badge: 'icon-care-192.png',
       tag: isCall ? 'ime-call' : 'ime-' + Date.now(),
       renotify: true,
       requireInteraction: isCall,               // a call stays up until answered
-      vibrate: isCall ? [300, 150, 300, 150, 300] : [120, 60, 120],
+      vibrate: isCall ? [400, 200, 400, 200, 400, 200, 400] : [120, 60, 120],
+      // Big, obvious buttons on the lock screen. She can't read well, so the
+      // green Answer is the thing that matters; one tap goes straight in.
+      actions: isCall ? [
+        { action: 'answer',  title: '\u2705 Answer' },
+        { action: 'decline', title: '\u274C Not now' }
+      ] : [],
       data: { kind: data.kind, room: data.room, from: data.from }
     });
   })());
@@ -94,6 +100,7 @@ self.addEventListener('notificationclick', event => {
     const wins = await clients.matchAll({ type: 'window', includeUncontrolled: true });
     // A call opens the tablet app and rings; anything else opens the care app.
     if (d.kind === 'call') {
+      if (event.action === 'decline') return;    // just dismiss
       for (const c of wins) {
         if (!c.url.includes('care.html') && 'focus' in c) {
           c.postMessage({ type: 'incoming-call', room: d.room, from: d.from });
