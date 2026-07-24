@@ -543,7 +543,9 @@ async function sync(){
     // tablet's own outgoing calls, which are addressed to a caregiver name.
     // Caller hung up before she answered: their call row is gone, so stop.
     if(askMsg && askMsg.room && !MSGS.some(m=>m.id===askMsg.id)){ closeAsk(); }
-    const pending=MSGS.filter(m=>(m.dir==='ask' || (m.dir==='call' && (!m.who || m.who==='__tablet__'))) && !HANDLED[m.id] && Date.now()-m.at < 60000);
+    const careNames = new Set(((CFG&&CFG.contacts)||[]).map(p=>p.name));
+    const forHer = m => !m.who || m.who==='__tablet__' || !careNames.has(m.who);
+    const pending=MSGS.filter(m=>(m.dir==='ask' || (m.dir==='call' && forHer(m))) && !HANDLED[m.id] && Date.now()-m.at < 90000);
     if(pending.length && !askMsg && !callRoom){
       const m=pending[pending.length-1];
       if(m.dir==='call'){
@@ -1894,12 +1896,18 @@ document.addEventListener('click', e=>{
     lines.push('Worker set: '+(API||'none')+' / '+(HOUSE||'none'));
     lines.push('Connected: '+(online?'yes':'no'));
     lines.push('Tasks loaded: '+tasks().length);
+    const calls=(MSGS||[]).filter(m=>m.dir==='call');
+    const last=calls[calls.length-1];
+    lines.push('Call rows seen: '+calls.length+(last?(' — last to "'+(last.who||'(blank)')+'" '+Math.round((Date.now()-last.at)/1000)+'s ago'):''));
+    lines.push('Notifications: '+(('Notification' in window)?Notification.permission:'not supported'));
     out.textContent=lines.join('\n');
 
     Promise.all([
       fetch('manifest.json').then(r=>'Manifest: '+(r.ok?'found':'HTTP '+r.status)).catch(e=>'Manifest: failed'),
       ('serviceWorker' in navigator)
-        ? navigator.serviceWorker.getRegistration().then(r=>'Service worker: '+(r?'registered':'not registered'))
+        ? navigator.serviceWorker.ready.then(r=>r.pushManager.getSubscription())
+            .then(sub=>'Push subscription: '+(sub?'yes':'NONE — tap Turn on notifications'))
+            .catch(()=>'Push subscription: could not check')
         : Promise.resolve('Service worker: not supported'),
       API ? fetch(API.replace(/\/$/,'')).then(r=>'Worker reachable: '+(r.ok?'yes':'HTTP '+r.status)).catch(()=>'Worker reachable: no')
           : Promise.resolve('Worker reachable: no address set')
@@ -2045,7 +2053,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-i';
+const APP_VERSION='2026-07-22-j';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
