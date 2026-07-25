@@ -301,6 +301,12 @@ body[data-part="evening"] .stars i{background:rgba(255,255,255,.16)}
 .rbtns{max-width:820px;margin:26px auto 0;display:flex;gap:12px}
 .rbtns .ok{flex:1;background:#12793C;color:#fff;border-radius:24px;padding:22px;font-family:var(--display);font-weight:800;font-size:26px}
 .rbtns .skip{background:transparent;border:3px solid rgba(34,32,28,.22);border-radius:22px;padding:22px 24px;font-weight:800;font-size:18px}
+
+.sayrow{display:flex;align-items:stretch;gap:10px;margin-bottom:14px}
+.sayrow .say{flex:1;margin-bottom:0}
+.hear{flex:none;width:74px;border-radius:22px;background:var(--surface);box-shadow:var(--shadow);
+  font-size:30px;display:grid;place-items:center}
+.hear:active{transform:scale(.96)}
 </style>
 </head>
 <body data-part="morning">
@@ -1083,10 +1089,32 @@ function showIncomingCall(m){
     </div>`;
   document.getElementById('ask').classList.remove('hide');
   askMsg=m;
-  chime([880,660,880]); speak(m.who+' is calling you.');
+
+  /* Keep ringing. One chime is easy to miss, and a call she never notices is
+     the same as no call at all. Rings until she answers, declines, or it
+     gives up on its own. */
+  startRinging(m.who||'Someone');
 }
 
-function closeAsk(){ document.getElementById('ask').classList.add('hide'); askMsg=null; }
+let ringInt=null, ringStop=null;
+function startRinging(who){
+  stopRinging();
+  const ring=()=>{
+    chime([880,660,880,660]);
+    try{ if(navigator.vibrate) navigator.vibrate([500,250,500]); }catch(e){}
+    speak(who+' is calling you.');
+  };
+  ring();
+  ringInt=setInterval(ring, 4000);
+  ringStop=setTimeout(()=>{ stopRinging(); closeAsk(); }, 45000);   // give up quietly
+}
+function stopRinging(){
+  if(ringInt){ clearInterval(ringInt); ringInt=null; }
+  if(ringStop){ clearTimeout(ringStop); ringStop=null; }
+  try{ if(navigator.vibrate) navigator.vibrate(0); }catch(e){}
+}
+
+function closeAsk(){ stopRinging(); document.getElementById('ask').classList.add('hide'); askMsg=null; }
 
 async function sendPhoto(){
   const m=askMsg;
@@ -1121,6 +1149,12 @@ function declineAsk(){
   const m=askMsg;
   if(m){ HANDLED[m.id]=true; LS.set('handled',HANDLED); }
   QUEUE.push({path:'/decline',body:{askId:m?m.id:null,who:m?m.who:''}});
+  // If this was a video call, tell the caller so their screen closes too.
+  // Without this they sit watching a ringing screen she has already dismissed.
+  if(m && m.room){
+    QUEUE.push({path:'/signal',body:{room:m.room,side:'b',kind:'end',payload:'null'}});
+    QUEUE.push({path:'/call-cancel',body:{room:m.room}});
+  }
   LS.set('queue',QUEUE); flushQueue();
   closeAsk();
   speak('Okay. I told them not right now.');
@@ -1734,8 +1768,14 @@ function renderMsg(){
   const mine = phrases.filter(forMatch);
   const needs = mine.filter(p=>(p.kind||'need')==='need');
   const nice  = mine.filter(p=>p.kind==='nice');
+  /* A speaker on each one so she can hear what a picture means without
+     sending it. She learns the emoji by hearing the words attached to it,
+     which matters most for phrases someone added later. */
   const row = list => list.map(p=>
-    `<button class="say" data-send="${p.id}"><em>${p.icon}</em><b>${esc(p.text)}</b></button>`).join('');
+    `<div class="sayrow">
+       <button class="say" data-send="${p.id}"><em>${p.icon}</em><b>${esc(p.text)}</b></button>
+       <button class="hear" data-hear="${p.id}" aria-label="Hear this">🔊</button>
+     </div>`).join('');
 
   body.innerHTML = `<button class="btn ghost" style="margin-bottom:18px;max-width:320px" data-back="1">← Pick someone else</button>
     <button class="say" data-callp="${c.id}" style="background:#2B4FD0;color:#fff">
@@ -1756,7 +1796,9 @@ function send(phraseId){
   const c=(CFG.contacts||[]).find(x=>x.id===picked);
   const p=(CFG.phrases||[]).find(x=>x.id===phraseId);
   if(!c||!p) return;
-  chime([784,988]); speak('Sent to '+c.name);
+  chime([784,988]);
+  // Read back what she sent, so she always hears the words she chose
+  speak(p.text+' Sent to '+c.name+'.');
   MSGS.push({id:-Date.now(),dir:'out',who:c.name,body:p.text,icon:p.icon,at:Date.now()});
   LS.set('msgs',MSGS);
   QUEUE.push({path:'/say',body:{who:c.name,text:p.text,icon:p.icon}});
@@ -1837,6 +1879,12 @@ document.addEventListener('click', e=>{
       picked=null;
       startCall(room,'a',person.name);
     }
+    return;
+  }
+  const hp=t.closest('[data-hear]');
+  if(hp){
+    const ph=((CFG&&CFG.phrases)||[]).find(x=>x.id===hp.dataset.hear);
+    if(ph){ unlockAudio(); speak(ph.text); }
     return;
   }
   const sd=t.closest('[data-send]'); if(sd){ send(sd.dataset.send); return; }
@@ -2053,7 +2101,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-j';
+const APP_VERSION='2026-07-22-m';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
@@ -2099,11 +2147,13 @@ function unlockAudio(){
 }
 document.addEventListener('pointerdown', unlockAudio, {once:false});
 
+
 loadWeekState();
 renderHome(); renderMsg(); updateBadge();
 sync(); loadWeather();
 setInterval(loadWeather, 1800000);
 setInterval(sync,25000);
+setInterval(()=>{ if(!callRoom && !askMsg) sync(); }, 6000);   // calls need to arrive quickly
 setInterval(()=>{ renderHome(); checkWarnings(); checkReminders(); },15000);
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ sync(); checkReminders(); } });
 setTimeout(checkReminders, 2500);
