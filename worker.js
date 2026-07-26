@@ -68,6 +68,33 @@ async function pushTo(topics, title, text, urgent) {
   return results;
 }
 
+
+/* Local wall-clock for a household, so a 6pm task is judged at 6pm where she
+   lives, not in the worker's UTC. */
+function localNow(tz){
+  const dtf = new Intl.DateTimeFormat('en-US', {timeZone: tz || 'America/New_York', hour12:false,
+    weekday:'short', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'});
+  const p = {}; for(const part of dtf.formatToParts(new Date())) p[part.type]=part.value;
+  const day = p.year+'-'+p.month+'-'+p.day;
+  const dow = {Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[p.weekday];
+  let hour = parseInt(p.hour,10); if(hour===24) hour=0;
+  return { day, dow, mins: hour*60 + parseInt(p.minute,10) };
+}
+const _tmins = x => { const [h,m]=String(x||'0:0').split(':').map(Number); return (h||0)*60+(m||0); };
+const _dueToday = (t, dow, day) =>
+  t.freq==='daily' || (t.freq==='weekly' && (t.days||[]).includes(dow)) || (t.freq==='once' && t.date===day);
+function _inQuiet(cfg, mins){
+  const f=_tmins(cfg.quietFrom||'21:30'), to=_tmins(cfg.quietTo||'07:00');
+  return f>to ? (mins>=f || mins<to) : (mins>=f && mins<to);
+}
+async function _nudgedAlready(env, code, day, k){
+  const row = await env.DB.prepare('SELECT 1 FROM nudges WHERE code=? AND day=? AND k=?').bind(code,day,k).first();
+  return !!row;
+}
+async function _markNudged(env, code, day, k){
+  await env.DB.prepare('INSERT OR IGNORE INTO nudges (code,day,k,at) VALUES (?,?,?,?)').bind(code,day,k,Date.now()).run();
+}
+
 const loadConfig = async (env, house) => {
   const row = await env.DB.prepare('SELECT config FROM household WHERE code = ?').bind(house).first();
   return row ? JSON.parse(row.config) : {};
@@ -153,6 +180,18 @@ async function webPushOne(env, sub, title, body, extra){
     });
     return { status:r.status };
   }catch(e){ return { status:0, error:String(e&&e.message||e) }; }
+}
+
+// Push the tablet with a task reminder even when the app is closed.
+async function ringTabletReminder(env, house, cfg, taskName){
+  const subs = await webSubsFor(env, house, '__tablet__');
+  for(const sub of subs){
+    const r = await webPushOne(env, sub, 'Time to ' + String(taskName || 'do the next thing').toLowerCase(),
+      'Tap to open', { kind:'reminder' });
+    if(r.status === 410 || r.status === 404){
+      await env.DB.prepare('DELETE FROM push_subs WHERE code = ? AND endpoint = ?').bind(house, sub.endpoint).run();
+    }
+  }
 }
 
 // Push the tablet so a caregiver's call wakes it and rings.
@@ -268,7 +307,7 @@ export default {
           ).bind(house, back.toISOString().slice(0, 10), day).all();
 
           const msgs = await env.DB.prepare(
-            'SELECT id, dir, who, body, icon, at, seen, ack, ack_at FROM messages WHERE code = ? ORDER BY id DESC LIMIT 40'
+            'SELECT id, dir, who, body, icon, at, seen, ack, ack_at, toname FROM messages WHERE code = ? ORDER BY id DESC LIMIT 40'
           ).bind(house).all();
 
           return json({
@@ -311,6 +350,23 @@ export default {
           // Buzzes the person she picked. Everyone still sees it in the thread.
           const cfg = await loadConfig(env, house);
           await notify(env, house, cfg, namesFor(cfg, who), (cfg.name || 'IndependentME') + ' to ' + (who || 'everyone'), text, false);
+          return json({ ok: true });
+        }
+
+        /* ---------- caregiver to caregiver (not shown to Karelynn) ---------- */
+        case '/fam': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          const { from, to, text } = body;
+          if (!text) return json({ error: 'Missing message' }, 400);
+          await env.DB.prepare(
+            'INSERT INTO messages (code, dir, who, body, icon, at, seen, toname) VALUES (?, ?, ?, ?, ?, ?, 0, ?)'
+          ).bind(house, 'fam', from || '', text, '\uD83D\uDCAC', Date.now(), to || 'everyone').run();
+          const cfg = await loadConfig(env, house);
+          // Notify the recipient(s), never the sender.
+          const targets = (to && to !== 'everyone')
+            ? [to]
+            : (cfg.contacts || []).map(p => p.name).filter(n => n !== from);
+          await notify(env, house, cfg, targets, (from || 'Someone'), text, false);
           return json({ ok: true });
         }
 
@@ -659,6 +715,55 @@ export default {
         const cutoff = Date.now() - cfg.keepDays * 86400000;
         await env.DB.prepare('DELETE FROM messages WHERE code = ? AND at < ?').bind(h.code, cutoff).run();
         await env.DB.prepare('DELETE FROM photos   WHERE code = ? AND at < ?').bind(h.code, cutoff).run();
+      }
+
+
+      // ---- Task reminders (works even when her app is closed) ----
+      // The tablet only reminds while it's open, so mornings work and evenings
+      // slip. Here the server nudges her tablet when a task comes due, nudges
+      // again if it lingers, and finally tells a caregiver so a person can step
+      // in. Nothing fires during quiet hours.
+      if ((cfg.tasks || []).length) {
+        const L = localNow(cfg.tz);
+        const relaxed = ((cfg.relaxedDays || []).includes(L.dow));
+        if (!_inQuiet(cfg, L.mins) && !relaxed) {
+          const doneRows = await env.DB.prepare(
+            'SELECT task_id FROM log WHERE code = ? AND day = ?'
+          ).bind(h.code, L.day).all();
+          const doneSet = new Set((doneRows.results || []).map(r => r.task_id));
+          const escMin = cfg.remindEscalateMinutes != null ? cfg.remindEscalateMinutes : 20;
+
+          for (const t of cfg.tasks) {
+            if (!t.time || !_dueToday(t, L.dow, L.day)) continue;
+            if (doneSet.has(t.id)) continue;
+            const overdue = L.mins - _tmins(t.time);
+            if (overdue < 0) continue;
+
+            // nudge her tablet at due time, and again ~10 min later
+            for (const [stage, at] of [['r0', 0], ['r10', 10]]) {
+              if (overdue >= at && overdue < at + 5 && !(await _nudgedAlready(env, h.code, L.day, t.id + '|' + stage))) {
+                await _markNudged(env, h.code, L.day, t.id + '|' + stage);
+                await ringTabletReminder(env, h.code, cfg, t.name);
+              }
+            }
+
+            // tell a caregiver once if it's still undone after the threshold
+            if (escMin && overdue >= escMin && !(await _nudgedAlready(env, h.code, L.day, t.id + '|esc'))) {
+              await _markNudged(env, h.code, L.day, t.id + '|esc');
+              const now = new Date();
+              const names = (cfg.contacts || [])
+                .filter(p => p.escalate !== false)
+                .filter(p => freeNow(p, now) || p.fallback)
+                .map(p => p.name);
+              const targets = names.length ? names : (cfg.contacts || []).filter(p => p.fallback).map(p => p.name);
+              await notify(env, h.code, cfg, targets,
+                (cfg.name || 'IndependentME') + ' reminder',
+                (cfg.name || 'She') + " hasn't done: " + t.name, false);
+            }
+          }
+        }
+        // tidy old nudge markers
+        await env.DB.prepare('DELETE FROM nudges WHERE code = ? AND day < ?').bind(h.code, L.day).run();
       }
 
       const houseGrace = cfg.helpFallbackMinutes != null ? cfg.helpFallbackMinutes : 10;

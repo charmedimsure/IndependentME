@@ -7,7 +7,7 @@
    as the tablet has signal. The cache exists only so the app still
    opens when the wifi is down. */
 
-const VERSION = '2026-07-22-m';
+const VERSION = '2026-07-22-p';
 const CACHE   = 'independentme-' + VERSION;
 const SHELL   = ['./', './index.html', './care.html', './manifest.json', './manifest-care.json'];
 
@@ -113,6 +113,8 @@ self.addEventListener('notificationclick', event => {
     for (const c of wins) {
       if (c.url.includes('care.html') && 'focus' in c) return c.focus();
     }
-    if (clients.openWindow) return clients.openWindow('./care.html');
+    // A task reminder belongs to the tablet; anything else to the care app.
+    const target = d.kind === 'reminder' ? './' : './care.html';
+    if (clients.openWindow) return clients.openWindow(target);
   })());
 });

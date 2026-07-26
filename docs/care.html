@@ -125,6 +125,29 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 .callring .btns{display:flex;gap:16px;margin-top:14px}
 .callring .ans{background:#3ECF7C;color:#08210F;border-radius:40px;padding:20px 34px;font-weight:800;font-size:19px}
 .callring .dec{background:#E8604C;color:#fff;border-radius:40px;padding:20px 34px;font-weight:800;font-size:19px}
+
+/* Family thread */
+.who-pick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.who-pick button{display:flex;align-items:center;gap:7px;padding:7px 12px 7px 7px;border-radius:22px;
+  background:var(--panel-2);font-weight:700;font-size:14px;border:2px solid transparent}
+.who-pick button[aria-pressed="true"]{border-color:var(--amber);background:rgba(242,179,61,.12)}
+.pfp{width:34px;height:34px;border-radius:50%;flex:none;display:grid;place-items:center;overflow:hidden;
+  background:linear-gradient(150deg,#3a4668,#2a3350);font-size:18px}
+.pfp img{width:100%;height:100%;object-fit:cover}
+.pfp.big{width:42px;height:42px;font-size:22px}
+.thread{display:flex;flex-direction:column;gap:2px}
+.mrow{display:flex;gap:11px;align-items:flex-start;padding:9px 0}
+.mrow .mbody{flex:1;min-width:0}
+.mrow .mfrom{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:14.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.mrow .mto{font-weight:600;font-size:12.5px;color:var(--soft)}
+.mrow .mbub{margin-top:4px;background:var(--panel-2);border-radius:4px 16px 16px 16px;padding:11px 14px;font-size:15.5px;line-height:1.4;display:inline-block;max-width:100%}
+.mrow.her .mbub{background:rgba(124,92,255,.16)}
+.mrow.tofam .mbub{background:rgba(123,175,201,.14)}
+.mrow .mtime{font-size:11.5px;color:var(--soft);margin-top:4px}
+.mrow.sys{justify-content:center;text-align:center;padding:12px 0}
+.mrow.sys .sysbub{background:rgba(242,179,61,.14);color:var(--warn);border-radius:14px;padding:11px 15px;font-size:14px;font-weight:700;max-width:90%}
+.mrow.sys .sysbub.sos{background:rgba(232,96,76,.16);color:var(--miss)}
+.mdel{flex:none;background:transparent;color:var(--miss);font-size:17px;padding:2px 6px;opacity:.7}
 </style>
 </head>
 <body>
@@ -250,12 +273,13 @@ function effT(t){
   return (w&&m>=w.from&&m<w.to) ? w.to+5 : m;
 }
 const _todayISO=()=>new Date().toISOString().slice(0,10);
+const isRelaxedDow=(dow)=>(((CFG&&CFG.relaxedDays)||[]).includes(dow));
 const dueOn=(t,dow)=>t.freq==='daily'||(t.freq==='weekly'&&(t.days||[]).includes(dow))||(t.freq==='once'&&t.date && t.date<=_todayISO());
 
 let blankIds={};
 const blank=()=>({
   name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8, keepDays:30, showWholeDay:false,
-  quietFrom:'21:30', quietTo:'07:00',
+  quietFrom:'21:30', quietTo:'07:00', tz:'America/New_York', remindEscalateMinutes:20, relaxedDays:[],
   rewardOn:true, rewardNeed:0, weekNeedDays:7,
   period:{ active:false, startedOn:null, log:[], everyHours:3, fromHour:8, toHour:21, useSteps:true,
     steps:[
@@ -438,7 +462,7 @@ function render(){
 
   document.getElementById('pageTitle').textContent =
     {today:'Today',week:'This week',msgs:'Messages',plan:'Her plan',setup:'Setup'}[tab];
-  const unread=MSGS.filter(m=>(m.dir==='out'||m.dir==='alert')&&!m.seen).length;
+  const unread=MSGS.filter(m=>!m.seen && ((m.dir==='out'||m.dir==='alert') || (m.dir==='fam' && m.who!==ME && (m.toname===ME || m.toname==='everyone' || !m.toname)))).length;
   const b=document.getElementById('bdg');
   b.textContent=unread; b.classList.toggle('hide',unread===0);
   document.querySelectorAll('.tab').forEach(x=>x.setAttribute('aria-current',x.dataset.tab===tab));
@@ -456,7 +480,8 @@ function viewToday(){
   const n=list.filter(t=>doneMap[t.id]).length;
   const pct=list.length?n/list.length:0;
   const C=2*Math.PI*40;
-  const late=list.filter(t=>!doneMap[t.id]&&mins(t.time)<nowM-30).length;
+  const relaxed=isRelaxedDow(new Date().getDay());
+  const late=relaxed?0:list.filter(t=>!doneMap[t.id]&&mins(t.time)<nowM-30).length;
 
   el.innerHTML=`
   <div class="panel"><div class="summary">
@@ -467,6 +492,7 @@ function viewToday(){
     <div class="txt"><b>${DAYS[dow]}</b>${
       !list.length?'Nothing scheduled today.'
       : n===list.length?'Everything is done. Nice day.'
+      : relaxed ? 'Relaxed day — no rush.'
       : late ? late+' past due, '+(list.length-n)+' left overall.'
       : (list.length-n)+' still to go, nothing overdue.'}</div>
   </div></div>
@@ -474,7 +500,7 @@ function viewToday(){
   <div class="panel"><h3>The list</h3>${
     list.length? list.map(t=>{
       const at=doneMap[t.id];
-      const isLate=!at && mins(t.time)<nowM-30;
+      const isLate=!relaxed && !at && mins(t.time)<nowM-30;
       return `<div class="trow">
         <div class="tico">${t.photo?`<img src="${t.photo}">`:icoHTML(t.icon)}</div>
         <div class="tmain"><div class="tname">${esc(t.name)}</div>
@@ -500,6 +526,7 @@ function viewWeek(){
           const k=key(d);
           if(!dueOn(t,d.getDay())) return `<div class="cell x"></div>`;
           if(map[k+'|'+t.id]) return `<div class="cell y"></div>`;
+          if(isRelaxedDow(d.getDay())) return `<div class="cell x"></div>`;   // relaxed: never red
           return `<div class="cell ${k===nowKey?'':'n'}"></div>`;
         }).join('')).join('')}
     </div>
@@ -521,27 +548,52 @@ async function loadShots(){
 
 function viewMsgs(){
   const el=document.getElementById('view');
-  const quick=['On my way.','Yes, go ahead.','I will call you soon.','Great job today!','Love you too.','I am here.'];
+  const HER=(CFG&&CFG.name)||'Karelynn';
+  const people=(CFG&&CFG.contacts)||[];
+
+  // avatar for anyone in the thread
+  const av=(name,big)=>{
+    if(name===HER) return `<div class="pfp${big?' big':''}" style="background:linear-gradient(150deg,#7c5cff,#a48bff)">${(CFG&&CFG.herPhoto)?`<img src="${CFG.herPhoto}">`:'💜'}</div>`;
+    const c=people.find(x=>x.name===name);
+    if(c) return `<div class="pfp${big?' big':''}">${c.photo?`<img src="${c.photo}">`:`<span>${c.icon||'🙂'}</span>`}</div>`;
+    return `<div class="pfp${big?' big':''}">🔔</div>`;
+  };
+
+  // who am I sending to right now
+  if(!window._msgTo) window._msgTo = HER;
+  const toKarelynn = window._msgTo===HER;
+  const quick = toKarelynn
+    ? ['On my way.','Yes, go ahead.','I will call you soon.','Great job today!','Love you too.','I am here.']
+    : ['On my way.','Thanks!','Yes.','No.','Call me.','Running late.'];
+
+  const pickBtn=(name,label)=>`<button data-to="${esc(name)}" aria-pressed="${window._msgTo===name}">${name==='everyone'?'👪':av(name)}<span>${esc(label)}</span></button>`;
+
   el.innerHTML=`
-    <div class="panel"><h3>Check in</h3>
+    <div class="panel"><h3>Check in on ${esc(HER)}</h3>
       <div class="checkin">
         <button class="ci-ask" id="ciAsk">👋 Ask to see her</button>
         <button class="ci-call" id="ciCall">📹 Video call</button>
       </div>
-      <p class="note">She gets a prompt with your name on it and chooses: send a picture, start a call, or not right now. Nothing opens her camera without her tapping it.</p>
       ${PHOTOS.length?`<div class="shots" style="margin-top:16px">${PHOTOS.map(ph=>
         `<button class="shot" data-photo="${ph.id}"><div class="t">${clock(ph.at)}</div></button>`).join('')}</div>`:''}
     </div>
 
     <div class="panel"><h3>Send a message</h3>
-      <div class="quick">${quick.map(q=>`<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
-      <textarea id="reply" rows="2" placeholder="Type something to read out on the tablet">${esc(draftReply)}</textarea>
-      <button class="btn" style="margin-top:11px" id="sendBtn">Send to the tablet</button>
-      <p class="note" style="margin-top:10px">It arrives on her screen with a chime and is read out loud, so it works whether or not she reads it.</p>
+      <label class="f">To</label>
+      <div class="who-pick">
+        ${pickBtn(HER,HER)}
+        ${people.filter(c=>c.name!==ME).map(c=>pickBtn(c.name,c.name)).join('')}
+        ${people.length>1?pickBtn('everyone','Everyone'):''}
+      </div>
+      <textarea id="reply" rows="2" placeholder="${toKarelynn?('Something to read out loud to '+esc(HER)):('Message '+esc(window._msgTo))}">${esc(draftReply)}</textarea>
+      <div class="quick" style="margin-top:10px">${quick.map(q=>`<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <button class="btn" style="margin-top:11px" id="sendBtn">Send${toKarelynn?' to the tablet':''}</button>
+      ${toKarelynn?`<p class="note" style="margin-top:10px">Arrives on her screen with a chime and is read out loud.</p>`
+                 :`<p class="note" style="margin-top:10px">Goes to ${window._msgTo==='everyone'?'the other caregivers':esc(window._msgTo)} only. ${esc(HER)} does not see this.</p>`}
     </div>
 
     <div class="panel">
-      <h3 style="display:flex;justify-content:space-between;align-items:center">History
+      <h3 style="display:flex;justify-content:space-between;align-items:center">Messages
         <button style="font-size:12px;letter-spacing:.06em;color:var(--amber)" id="tidyToggle">${TIDY?'Done':'Tidy up'}</button>
       </h3>
       ${TIDY?`<div class="quick" style="margin-bottom:14px">
@@ -549,21 +601,31 @@ function viewMsgs(){
         <button data-purge="30">Delete older than a month</button>
         <button data-purge="all" style="color:var(--miss);border-color:var(--miss)">Delete everything</button>
       </div>`:''}
-      ${
-      MSGS.filter(m=>m.dir!=='call' && m.dir!=='ask').length ? MSGS.filter(m=>m.dir!=='call' && m.dir!=='ask').slice().reverse().map(m=>
-        m.dir==='alert'
-        ? `<div class="msg from"><div class="av">${m.icon||'⏰'}</div><div>
-             <div class="b ${m.seen?'':'unseen'}" style="background:${m.icon==='🆘'?'rgba(232,96,76,.16);color:var(--miss)':'rgba(242,179,61,.14);color:var(--warn)'}">${esc(m.body)}</div>
-             <div class="when">${m.icon==='🎁'?'earned':(m.who?'she asked '+esc(m.who):'everyone')} · ${clock(m.at)}${m.ack?' · '+esc(m.ack)+(m.icon==='🎁'?' gave it':' has it'):''}</div>
-             ${((m.icon==='🆘'||m.icon==='🎁')&&!m.ack)?`<button class="btn" style="margin-top:8px;padding:10px 14px;font-size:14px;width:auto" data-ack="${m.id}">${m.icon==='🎁'?'Given ✓':"I've got this"}</button>`:''}
-             </div>${TIDY?`<button class="x" style="background:transparent;color:var(--miss);font-size:18px;padding:4px 8px" data-del="${m.id}">✕</button>`:''}</div>`
-        : m.dir==='out'
-        ? `<div class="msg from"><div class="av">${m.icon||'💬'}</div><div>
-             <div class="b ${m.seen?'':'unseen'}">${esc(m.body)}</div>
-             <div class="when">to ${esc(m.who||'')} · ${clock(m.at)}</div></div>${TIDY?`<button class="x" style="background:transparent;color:var(--miss);font-size:18px;padding:4px 8px" data-del="${m.id}">✕</button>`:''}</div>`
-        : `<div class="msg to"><div class="av">↩︎</div><div>
-             <div class="b">${esc(m.body)}</div><div class="when">${esc(m.who||'someone')} · ${clock(m.at)}</div></div>${TIDY?`<button class="x" style="background:transparent;color:var(--miss);font-size:18px;padding:4px 8px" data-del="${m.id}">✕</button>`:''}</div>`
-      ).join('') : '<div class="empty">No messages yet.</div>'}
+      <div class="thread">${
+      (()=>{
+        const list=MSGS.filter(m=>m.dir!=='call' && m.dir!=='ask').slice().reverse();
+        if(!list.length) return '<div class="empty">No messages yet.</div>';
+        return list.map(m=>{
+          const del=TIDY?`<button class="mdel" data-del="${m.id}">✕</button>`:'';
+          if(m.dir==='alert'){
+            const sos=m.icon==='🆘';
+            const meta = m.icon==='🎁'?'earned':(m.who?('she asked '+esc(m.who)):'everyone');
+            const ackBtn=((sos||m.icon==='🎁')&&!m.ack)?`<button class="btn" style="margin-top:8px;padding:9px 14px;font-size:14px;width:auto" data-ack="${m.id}">${m.icon==='🎁'?'Given ✓':"I've got this"}</button>`:'';
+            return `<div class="mrow sys"><div class="sysbub ${sos?'sos':''}">${m.icon||'🔔'} ${esc(m.body)}<div class="mtime" style="margin-top:4px">${meta} · ${clock(m.at)}${m.ack?' · '+esc(m.ack)+(m.icon==='🎁'?' gave it':' has it'):''}</div>${ackBtn}</div>${del}</div>`;
+          }
+          let from,to,cls='';
+          if(m.dir==='out'){ from=HER; to=m.who||'someone'; cls='her'; }
+          else if(m.dir==='fam'){ from=m.who||'someone'; to=m.toname||'everyone'; cls='tofam'; }
+          else { from=m.who||'someone'; to=HER; }              // dir 'in' = caregiver to Karelynn
+          return `<div class="mrow ${cls}">${av(from)}
+            <div class="mbody">
+              <div class="mfrom">${esc(from)} <span class="mto">→ ${to==='everyone'?'everyone':esc(to)}</span></div>
+              <div class="mbub">${m.icon&&m.dir!=='in'&&m.dir!=='fam'?'':''}${esc(m.body)}</div>
+              <div class="mtime">${clock(m.at)}${(m.dir==='in'||m.dir==='out')&&m.seen?' · seen':''}</div>
+            </div>${del}</div>`;
+        }).join('');
+      })()}
+      </div>
     </div>`;
 }
 
@@ -664,6 +726,10 @@ function secBody(){
     <div class="row"><button class="chip" id="sWhole" aria-pressed="${!!(CFG&&CFG.showWholeDay)}">${(CFG&&CFG.showWholeDay)?'The whole day at once':'Only what it is time for'}</button></div>
     <p class="note" style="margin-top:10px">By default a task appears when its time arrives, not before. The arc across the top of her screen still shows the whole day as dots, so she can see what is coming without being handed a button she should not press yet.</p>
     <button class="btn" style="margin-top:14px" id="saveWhole">Save</button>
+  </div><div class="panel"><h3>Relaxed days</h3>
+    <p class="note" style="margin-bottom:12px">On these days there is no morning deadline. Her tasks still show, but all day and at her own pace: no alarms, nothing marked late, and no caregiver alerts. Good for weekends or any day without day service.</p>
+    <div class="row" style="gap:4px">${D3.map((d,i)=>`<button class="chip" style="padding:11px 2px" data-relaxday="${i}" aria-pressed="${((CFG&&CFG.relaxedDays)||[]).includes(i)}">${d[0]}</button>`).join('')}</div>
+    <button class="btn" style="margin-top:14px" id="saveRelax">Save</button>
   </div><div class="panel"><h3>Quiet hours</h3>
     <p class="note" style="margin-bottom:12px">Nothing rings between these times, so the tablet never wakes her. Reminders wait for morning.</p>
     <div class="row">
@@ -673,6 +739,14 @@ function secBody(){
         <input type="time" id="sQuietTo" value="${(CFG&&CFG.quietTo)||'07:00'}"></div>
     </div>
     <button class="btn" style="margin-top:16px" id="saveQuiet">Save</button>
+  </div><div class="panel"><h3>If she misses a reminder</h3>
+    <p class="note" style="margin-bottom:12px">Her tablet is nudged when a task comes due and again a few minutes later. If it still isn't done after this long, a caregiver is told so someone can help. Works even when her app is closed.</p>
+    <label class="f">Tell a caregiver after</label>
+    <select id="sEsc">
+      <option value="0" ${!(CFG&&CFG.remindEscalateMinutes)?'selected':''}>Don't tell anyone</option>
+      ${[10,15,20,30,45].map(n=>`<option value="${n}" ${((CFG&&CFG.remindEscalateMinutes)||20)===n?'selected':''}>${n} minutes</option>`).join('')}
+    </select>
+    <button class="btn" style="margin-top:14px" id="saveEsc">Save</button>
   </div><div class="panel"><h3>Her name</h3>
     <input id="sName" value="${esc((CFG&&CFG.name)||'')}" placeholder="Karelynn">
     <label class="f">How fast she's spoken to</label>
@@ -720,7 +794,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-m</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-p</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1448,11 +1522,19 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(t.closest('#lightbox')){ document.getElementById('lightbox').classList.add('hide'); return; }
-  const q=t.closest('[data-q]'); if(q){ document.getElementById('reply').value=q.dataset.q; return; }
+  const wp=t.closest('[data-to]');
+  if(wp){ window._msgTo=wp.dataset.to; render(); return; }
+  const q=t.closest('[data-q]'); if(q){ const r=document.getElementById('reply'); r.value=q.dataset.q; draftReply=r.value; return; }
   if(t.id==='sendBtn'){
     const box=document.getElementById('reply'), text=box.value.trim();
     if(!text) return;
-    try{ await post('/reply',{who:ME||'Someone',text,icon:'💬'}); box.value=''; draftReply=''; await pull(); }
+    const HER=(CFG&&CFG.name)||'Karelynn';
+    const to=window._msgTo||HER;
+    try{
+      if(to===HER){ await post('/reply',{who:ME||'Someone',text,icon:'💬'}); }
+      else { await post('/fam',{from:ME||'Someone',to,text}); }
+      box.value=''; draftReply=''; await pull();
+    }
     catch(err){ alert('Could not send: '+err.message); }
     return;
   }
@@ -1534,6 +1616,20 @@ document.addEventListener('click',async e=>{
     CFG.period.everyHours=+document.getElementById('sPerEvery').value||3;
     CFG.period.fromHour=+document.getElementById('sPerFrom').value;
     CFG.period.toHour=+document.getElementById('sPerTo').value;
+    await saveConfig(t); return;
+  }
+  const rd=t.closest('[data-relaxday]');
+  if(rd){
+    CFG=CFG||blank(); CFG.relaxedDays=CFG.relaxedDays||[];
+    const d=+rd.dataset.relaxday, i=CFG.relaxedDays.indexOf(d);
+    if(i>-1) CFG.relaxedDays.splice(i,1); else CFG.relaxedDays.push(d);
+    rd.setAttribute('aria-pressed', CFG.relaxedDays.includes(d));
+    return;
+  }
+  if(t.id==='saveRelax'){ CFG=CFG||blank(); await saveConfig(t); return; }
+  if(t.id==='saveEsc'){
+    CFG=CFG||blank();
+    CFG.remindEscalateMinutes=+document.getElementById('sEsc').value||0;
     await saveConfig(t); return;
   }
   if(t.id==='saveQuiet'){
