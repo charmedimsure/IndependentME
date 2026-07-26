@@ -148,6 +148,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--amber);outline-o
 .mrow.sys .sysbub{background:rgba(242,179,61,.14);color:var(--warn);border-radius:14px;padding:11px 15px;font-size:14px;font-weight:700;max-width:90%}
 .mrow.sys .sysbub.sos{background:rgba(232,96,76,.16);color:var(--miss)}
 .mdel{flex:none;background:transparent;color:var(--miss);font-size:17px;padding:2px 6px;opacity:.7}
+.qedit{background:rgba(232,96,76,.10)!important;border-color:rgba(232,96,76,.4)!important;color:var(--miss)!important}
 </style>
 </head>
 <body>
@@ -280,6 +281,8 @@ let blankIds={};
 const blank=()=>({
   name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8, keepDays:30, showWholeDay:false,
   quietFrom:'21:30', quietTo:'07:00', tz:'America/New_York', remindEscalateMinutes:20, relaxedDays:[],
+  quickHer:['I love you.','On my way.','Yes, go ahead.','I will call you soon.','Great job today!','I am here.'],
+  quickFam:['On my way.','Thanks!','Yes.','No.','Call me.','Running late.'],
   rewardOn:true, rewardNeed:0, weekNeedDays:7,
   period:{ active:false, startedOn:null, log:[], everyHours:3, fromHour:8, toHour:21, useSteps:true,
     steps:[
@@ -562,9 +565,12 @@ function viewMsgs(){
   // who am I sending to right now
   if(!window._msgTo) window._msgTo = HER;
   const toKarelynn = window._msgTo===HER;
-  const quick = toKarelynn
-    ? ['On my way.','Yes, go ahead.','I will call you soon.','Great job today!','Love you too.','I am here.']
+  const quickKey = toKarelynn ? 'quickHer' : 'quickFam';
+  const defQuick = toKarelynn
+    ? ['I love you.','On my way.','Yes, go ahead.','I will call you soon.','Great job today!','I am here.']
     : ['On my way.','Thanks!','Yes.','No.','Call me.','Running late.'];
+  const quick = (CFG && CFG[quickKey]) || defQuick;
+  const editingQuick = !!window._editQuick;
 
   const pickBtn=(name,label)=>`<button data-to="${esc(name)}" aria-pressed="${window._msgTo===name}">${name==='everyone'?'👪':av(name)}<span>${esc(label)}</span></button>`;
 
@@ -586,7 +592,18 @@ function viewMsgs(){
         ${people.length>1?pickBtn('everyone','Everyone'):''}
       </div>
       <textarea id="reply" rows="2" placeholder="${toKarelynn?('Something to read out loud to '+esc(HER)):('Message '+esc(window._msgTo))}">${esc(draftReply)}</textarea>
-      <div class="quick" style="margin-top:10px">${quick.map(q=>`<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+        <label class="f" style="margin:0">Quick taps</label>
+        <button style="font-size:12px;letter-spacing:.05em;color:var(--amber);background:none" id="editQuick">${editingQuick?'Done':'Edit'}</button>
+      </div>
+      ${editingQuick
+        ? `<div class="quick" style="margin-top:8px">${quick.map(q=>`<button class="qedit" data-delq="${esc(q)}">${esc(q)} &nbsp;✕</button>`).join('')||'<span class="note">None yet.</span>'}</div>
+           <div style="display:flex;gap:8px;margin-top:10px">
+             <input id="newQuick" placeholder="Add a quick message" style="flex:1">
+             <button class="btn" style="width:auto;padding:12px 16px" id="addQuick">Add</button>
+           </div>
+           <p class="note" style="margin-top:8px">These are your tap-to-send buttons for ${toKarelynn?esc(HER):'the other caregivers'}. Everyone shares the same set.</p>`
+        : `<div class="quick" style="margin-top:8px">${quick.map(q=>`<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
       <button class="btn" style="margin-top:11px" id="sendBtn">Send${toKarelynn?' to the tablet':''}</button>
       ${toKarelynn?`<p class="note" style="margin-top:10px">Arrives on her screen with a chime and is read out loud.</p>`
                  :`<p class="note" style="margin-top:10px">Goes to ${window._msgTo==='everyone'?'the other caregivers':esc(window._msgTo)} only. ${esc(HER)} does not see this.</p>`}
@@ -794,7 +811,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-p</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-q</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1522,6 +1539,23 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(t.closest('#lightbox')){ document.getElementById('lightbox').classList.add('hide'); return; }
+  if(t.id==='editQuick'){ window._editQuick=!window._editQuick; render(); return; }
+  if(t.id==='addQuick'){
+    const inp=document.getElementById('newQuick'); const val=(inp&&inp.value||'').trim();
+    if(!val) return;
+    const HER=(CFG&&CFG.name)||'Karelynn';
+    const key=(window._msgTo===HER || !window._msgTo)?'quickHer':'quickFam';
+    CFG=CFG||blank(); CFG[key]=CFG[key]||[];
+    if(!CFG[key].some(q=>q.toLowerCase()===val.toLowerCase())) CFG[key].push(val);
+    await saveConfig(); render(); return;
+  }
+  const dq=t.closest('[data-delq]');
+  if(dq){
+    const HER=(CFG&&CFG.name)||'Karelynn';
+    const key=(window._msgTo===HER || !window._msgTo)?'quickHer':'quickFam';
+    if(CFG&&CFG[key]){ CFG[key]=CFG[key].filter(q=>q!==dq.dataset.delq); await saveConfig(); render(); }
+    return;
+  }
   const wp=t.closest('[data-to]');
   if(wp){ window._msgTo=wp.dataset.to; render(); return; }
   const q=t.closest('[data-q]'); if(q){ const r=document.getElementById('reply'); r.value=q.dataset.q; draftReply=r.value; return; }
