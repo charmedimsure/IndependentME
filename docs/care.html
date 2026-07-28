@@ -606,7 +606,7 @@ function viewMsgs(){
         : `<div class="quick" style="margin-top:8px">${quick.map(q=>`<button data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
       <button class="btn" style="margin-top:11px" id="sendBtn">Send${toKarelynn?' to the tablet':''}</button>
       ${toKarelynn?`<p class="note" style="margin-top:10px">Arrives on her screen with a chime and is read out loud.</p>`
-                 :`<p class="note" style="margin-top:10px">Goes to ${window._msgTo==='everyone'?'the other caregivers':esc(window._msgTo)} only. ${esc(HER)} does not see this.</p>`}
+                 :`<p class="note" style="margin-top:10px">${window._msgTo==='everyone'?('Goes to the whole family. '+esc(HER)+' hears it read aloud, and the other caregivers get it too.'):('Goes to '+esc(window._msgTo)+' only. '+esc(HER)+' does not see this.')}</p>`}
     </div>
 
     <div class="panel">
@@ -764,7 +764,16 @@ function secBody(){
       ${[10,15,20,30,45].map(n=>`<option value="${n}" ${((CFG&&CFG.remindEscalateMinutes)||20)===n?'selected':''}>${n} minutes</option>`).join('')}
     </select>
     <button class="btn" style="margin-top:14px" id="saveEsc">Save</button>
-  </div><div class="panel"><h3>Her name</h3>
+  </div><div class="panel"><h3>Her name and photo</h3>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+      <div class="pfp big" id="herPfp" style="width:56px;height:56px;font-size:28px;background:linear-gradient(150deg,#7c5cff,#a48bff)">${(CFG&&CFG.herPhoto)?`<img src="${CFG.herPhoto}">`:'💜'}</div>
+      <div style="flex:1">
+        <button class="btn ghost" id="herPhotoBtn" style="width:auto;padding:11px 16px">${(CFG&&CFG.herPhoto)?'Change photo':'Add her photo'}</button>
+        ${(CFG&&CFG.herPhoto)?`<button class="btn ghost" id="herPhotoClear" style="width:auto;padding:11px 16px;margin-left:8px;color:var(--miss)">Remove</button>`:''}
+      </div>
+    </div>
+    <input type="file" accept="image/*" id="herFile" style="display:none">
+    <label class="f">Her name</label>
     <input id="sName" value="${esc((CFG&&CFG.name)||'')}" placeholder="Karelynn">
     <label class="f">How fast she's spoken to</label>
     <select id="sRate">${[[0.6,'Very slow'],[0.7,'Slow'],[0.8,'Steady'],[0.9,'Normal']].map(([v,l])=>`<option value="${v}" ${((CFG&&CFG.speechRate)||0.8)===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -811,7 +820,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-r</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-u</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1539,6 +1548,8 @@ document.addEventListener('click',async e=>{
     return;
   }
   if(t.closest('#lightbox')){ document.getElementById('lightbox').classList.add('hide'); return; }
+  if(t.id==='herPhotoBtn'){ document.getElementById('herFile').click(); return; }
+  if(t.id==='herPhotoClear'){ CFG=CFG||blank(); CFG.herPhoto=null; await saveConfig(); render(); return; }
   if(t.id==='editQuick'){ window._editQuick=!window._editQuick; render(); return; }
   if(t.id==='addQuick'){
     const inp=document.getElementById('newQuick'); const val=(inp&&inp.value||'').trim();
@@ -1566,6 +1577,12 @@ document.addEventListener('click',async e=>{
     const to=window._msgTo||HER;
     try{
       if(to===HER){ await post('/reply',{who:ME||'Someone',text,icon:'💬'}); }
+      else if(to==='everyone'){
+        // Everyone means the whole family, Karelynn included: she hears it read
+        // aloud on her tablet, and the other caregivers get it too.
+        await post('/reply',{who:ME||'Someone',text,icon:'💬'});
+        await post('/fam',{from:ME||'Someone',to:'everyone',text});
+      }
       else { await post('/fam',{from:ME||'Someone',to,text}); }
       box.value=''; draftReply=''; await pull();
     }
@@ -1871,6 +1888,10 @@ document.addEventListener('change',e=>{
     r.readAsText(f);
     return;
   }
+  if(e.target.id==='herFile'){
+    shrink(e.target.files[0], async d=>{ CFG=CFG||blank(); CFG.herPhoto=d; await saveConfig(); render(); });
+    return;
+  }
   if(e.target.id==='dFile'){
     shrink(e.target.files[0],d=>{ draft.photo=d; document.getElementById('dPrev').innerHTML=`<img src="${d}">`; });
   }
@@ -1944,7 +1965,7 @@ function hangUp(){
   const w=document.getElementById('callwrap'); w.classList.add('hide'); w.innerHTML='';
 }
 
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator && !window.Capacitor) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 /* ---- Web Push subscription ----
    Notifications come straight from the app through the browser's own push

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kare</title>
+<style>
+  :root{ --bg:#0E1016; --panel:#171A22; --ink:#EDEFF5; --soft:#8E95A8;
+    --her:#7c5cff; --care:#F2B33D; --shadow:0 10px 30px rgba(0,0,0,.35); }
+  *{ box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{ background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:26px; padding:28px; text-align:center; }
+  h1{ font-size:30px; font-weight:800; letter-spacing:-.5px; }
+  p.lead{ color:var(--soft); font-size:16px; max-width:320px; line-height:1.5; }
+  .pick{ width:100%; max-width:360px; display:flex; flex-direction:column; gap:16px; margin-top:6px; }
+  button{ font:inherit; border:none; cursor:pointer; }
+  .role{ display:flex; align-items:center; gap:16px; padding:22px 22px; border-radius:22px; box-shadow:var(--shadow);
+    background:var(--panel); color:var(--ink); text-align:left; }
+  .role .em{ font-size:38px; flex:none; }
+  .role .t{ flex:1; }
+  .role .t b{ display:block; font-size:20px; font-weight:800; margin-bottom:3px; }
+  .role .t span{ color:var(--soft); font-size:14px; line-height:1.35; }
+  .role.her{ border-left:6px solid var(--her); }
+  .role.care{ border-left:6px solid var(--care); }
+  .role:active{ transform:scale(.98); }
+  .foot{ color:var(--soft); font-size:12.5px; margin-top:8px; }
+  .redirecting{ color:var(--soft); font-size:15px; }
+</style>
+</head>
+<body>
+  <div id="wrap">
+    <h1>Set up this device</h1>
+    <p class="lead">Which one is this? You only pick once. You can change it later in Setup.</p>
+    <div class="pick">
+      <button class="role her" id="pickTablet">
+        <span class="em">💜</span>
+        <span class="t"><b>Karelynn's tablet</b><span>The picture tasks, reminders, and calls for Karelynn.</span></span>
+      </button>
+      <button class="role care" id="pickCare">
+        <span class="em">👪</span>
+        <span class="t"><b>A caregiver's phone</b><span>For Mom, Dad, Nan, or Shelby to check in and help.</span></span>
+      </button>
+    </div>
+    <div class="foot">Kare · IndependentME</div>
+  </div>
+
+<script>
+  var BASE = location.pathname.replace(/[^/]*$/, '');   // folder this file sits in
+  function go(role){
+    try{ localStorage.setItem('kareRole', role); }catch(e){}
+    location.replace(BASE + (role==='tablet' ? 'index.html' : 'care.html'));
+  }
+  // If a role was already chosen on this device, skip straight in.
+  try{
+    var saved = localStorage.getItem('kareRole');
+    if(saved==='tablet' || saved==='care'){
+      document.getElementById('wrap').innerHTML = '<p class="redirecting">Opening…</p>';
+      location.replace(BASE + (saved==='tablet' ? 'index.html' : 'care.html'));
+    }
+  }catch(e){}
+  document.getElementById('pickTablet').addEventListener('click', function(){ go('tablet'); });
+  document.getElementById('pickCare').addEventListener('click', function(){ go('care'); });
+</script>
+</body>
+</html>
