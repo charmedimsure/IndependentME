@@ -183,6 +183,82 @@ async function webPushOne(env, sub, title, body, extra){
 }
 
 // Push the tablet with a task reminder even when the app is closed.
+
+/* ============================================================
+   Firebase Cloud Messaging (HTTP v1)
+
+   Sends a high-priority "call" data message to the native Kare app so it can
+   ring over the lock screen. Needs two wrangler secrets:
+     FCM_CLIENT_EMAIL  - service account email
+     FCM_PRIVATE_KEY   - service account private key (PEM, with \n)
+   Project id is fixed below.
+   ============================================================ */
+const FCM_PROJECT_ID = 'independentme-1ea60';
+let _fcmToken = null, _fcmTokenExp = 0;
+
+function _pemToBytes(pem){
+  const b64 = String(pem||'').replace(/\\n/g, '\n').replace(/-----[^-]+-----/g, '').replace(/\s+/g, '');
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+async function _fcmAccessToken(env){
+  const now = Math.floor(Date.now()/1000);
+  if(_fcmToken && now < _fcmTokenExp - 60) return _fcmToken;
+  const email = env.FCM_CLIENT_EMAIL, key = env.FCM_PRIVATE_KEY;
+  if(!email || !key) throw new Error('FCM secrets not set');
+  const b64u = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  const te = x => new TextEncoder().encode(x);
+  const header = b64u(te(JSON.stringify({ alg:'RS256', typ:'JWT' })));
+  const claim = b64u(te(JSON.stringify({
+    iss: email, scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600
+  })));
+  const priv = await crypto.subtle.importKey('pkcs8', _pemToBytes(key),
+    { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['sign']);
+  const sig = new Uint8Array(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', priv, te(header+'.'+claim)));
+  const jwt = header + '.' + claim + '.' + b64u(sig);
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:'grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=' + jwt
+  });
+  const j = await r.json();
+  if(!j.access_token) throw new Error('FCM token: ' + JSON.stringify(j));
+  _fcmToken = j.access_token; _fcmTokenExp = now + (j.expires_in || 3600);
+  return _fcmToken;
+}
+// Send a data message to one device token. Returns {status} and never throws fatally.
+async function fcmSend(env, deviceToken, data){
+  try{
+    const token = await _fcmAccessToken(env);
+    const r = await fetch('https://fcm.googleapis.com/v1/projects/' + FCM_PROJECT_ID + '/messages:send', {
+      method:'POST',
+      headers:{ 'Authorization':'Bearer ' + token, 'Content-Type':'application/json' },
+      body: JSON.stringify({ message: {
+        token: deviceToken,
+        data: data,
+        android: { priority: 'high' }
+      }})
+    });
+    const body = await r.text();
+    if(r.status === 404 || r.status === 400){
+      // token dead: forget it
+      await env.DB.prepare('DELETE FROM fcm_tokens WHERE code = ? AND token = ?').bind(data.__house || '', deviceToken).run().catch(()=>{});
+    }
+    return { status:r.status, body };
+  }catch(e){ return { status:0, error:String(e && e.message || e) }; }
+}
+async function fcmTokensFor(env, house, person){
+  const rows = await env.DB.prepare('SELECT token FROM fcm_tokens WHERE code = ? AND person = ?').bind(house, person).all();
+  return (rows.results || []).map(r => r.token);
+}
+// Ring a person's native app over the lock screen.
+async function fcmRing(env, house, person, caller, room){
+  const tokens = await fcmTokensFor(env, house, person);
+  for(const t of tokens){
+    await fcmSend(env, t, { type:'call', caller: String(caller||'Someone'), room: String(room||''), __house: house });
+  }
+  return tokens.length;
+}
+
 async function ringTabletReminder(env, house, cfg, taskName){
   const subs = await webSubsFor(env, house, '__tablet__');
   for(const sub of subs){
@@ -467,9 +543,11 @@ export default {
           ).bind(house, 'call', to || '', room + '|' + (from || ''), '\u{1F4F9}', Date.now()).run();
           const cfg = await loadConfig(env, house);
           if (to === '__tablet__' || !to) {
-            await ringTablet(env, house, cfg, room, from);
+            await ringTablet(env, house, cfg, room, from);       // web-push fallback
+            await fcmRing(env, house, '__tablet__', from, room);  // native full-screen ring
           } else {
             await notify(env, house, cfg, namesFor(cfg, to), cfg.name || 'IndependentME', (from || 'Someone') + ' is calling', true);
+            await fcmRing(env, house, to, from, room);            // native ring for that caregiver
           }
           return json({ ok: true });
         }
@@ -502,6 +580,25 @@ export default {
 
         /* ---------- prove notifications work ---------- */
         /* ---------- the browser hands us its push subscription ---------- */
+        /* ---------- native app registers its FCM token for calls ---------- */
+        case '/fcm-register': {
+          const { person, token } = body;
+          if(person !== '__tablet__' && !await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          if(!person || !token) return json({ error: 'Missing person or token' }, 400);
+          await env.DB.prepare(
+            `INSERT INTO fcm_tokens (code, person, token, updated) VALUES (?, ?, ?, ?)
+             ON CONFLICT(code, token) DO UPDATE SET person = excluded.person, updated = excluded.updated`
+          ).bind(house, person, token, Date.now()).run();
+          return json({ ok: true });
+        }
+
+        case '/fcm-test': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          const cfgT = await loadConfig(env, house);
+          const n = await fcmRing(env, house, body.person || '__tablet__', (cfgT && cfgT.name) || 'Test', 'testroom');
+          return json({ ok: true, sentTo: n });
+        }
+
         case '/subscribe': {
           const { person, sub } = body;
           // The tablet has no caregiver key by design; it may only register

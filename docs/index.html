@@ -2032,6 +2032,26 @@ document.addEventListener('click', e=>{
   });
 })();
 
+
+/* ---- Native (Kare app) bridge ----
+   The native shell hands us this device's Firebase token; we register it with
+   the worker so calls can ring over the lock screen. And when she taps Answer
+   on the full-screen ring, the native side calls onKareAnswerCall to jump us
+   straight into that video call. */
+window.onKareFcmToken = function(token){
+  try{
+    if(!token || !API || !HOUSE) return;
+    if(window.__fcmDone===token) return; window.__fcmDone=token;
+    fetch(API.replace(/\/$/,'')+'/fcm-register',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ house:HOUSE, care:'__tablet__', person:'__tablet__', token })
+    }).catch(()=>{});
+  }catch(e){}
+};
+window.onKareAnswerCall = function(room){
+  try{ if(room){ if(typeof startCall==='function'){ startCall(room,'b'); } } }catch(e){}
+};
+
 /* Service worker: makes the app installable, keeps it opening offline, and
    receives call pushes that wake the tablet. */
 if('serviceWorker' in navigator){
@@ -2103,7 +2123,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-u';
+const APP_VERSION='2026-07-22-v';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
