@@ -279,7 +279,7 @@ const dueOn=(t,dow)=>t.freq==='daily'||(t.freq==='weekly'&&(t.days||[]).includes
 
 let blankIds={};
 const blank=()=>({
-  name:'', ntfy:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8, keepDays:30, showWholeDay:false,
+  name:'', snoozeMinutes:10, maxSnoozes:3, helpFallbackMinutes:10, nudgeTo:'primary', speechRate:0.8, keepDays:30, showWholeDay:false,
   quietFrom:'21:30', quietTo:'07:00', tz:'America/New_York', remindEscalateMinutes:20, relaxedDays:[],
   quickHer:['I love you.','On my way.','Yes, go ahead.','I will call you soon.','Great job today!','I am here.'],
   quickFam:['On my way.','Thanks!','Yes.','No.','Call me.','Running late.'],
@@ -342,10 +342,10 @@ const blank=()=>({
     const mom=uid(), dad=uid(), nan=uid(), shel=uid();
     blankIds={mom,dad,nan,shel};
     return [
-      {id:mom, name:'Mom',   icon:'👩',photo:null,ntfy:'',busy:{days:[],from:'08:00',to:'17:00'},override:'auto',escalate:true, fallback:true, grace:null},
-      {id:dad, name:'Dad',   icon:'👨',photo:null,ntfy:'',busy:{days:[1,2,3,4,5],from:'06:00',to:'17:00'},override:'auto',escalate:true, fallback:false,grace:null},
-      {id:nan, name:'Nan',   icon:'👧',photo:null,ntfy:'',busy:{days:[1,2,3,4,5],from:'07:30',to:'15:30'},override:'auto',escalate:false,fallback:false,grace:2},
-      {id:shel,name:'Shelby',icon:'👩',photo:null,ntfy:'',busy:{days:[1,2,3,4,5],from:'08:00',to:'17:00'},override:'auto',escalate:true, fallback:false,grace:null}
+      {id:mom, name:'Mom',   icon:'👩',photo:null,busy:{days:[],from:'08:00',to:'17:00'},override:'auto',escalate:true, fallback:true, grace:null},
+      {id:dad, name:'Dad',   icon:'👨',photo:null,busy:{days:[1,2,3,4,5],from:'06:00',to:'17:00'},override:'auto',escalate:true, fallback:false,grace:null},
+      {id:nan, name:'Nan',   icon:'👧',photo:null,busy:{days:[1,2,3,4,5],from:'07:30',to:'15:30'},override:'auto',escalate:false,fallback:false,grace:2},
+      {id:shel,name:'Shelby',icon:'👩',photo:null,busy:{days:[1,2,3,4,5],from:'08:00',to:'17:00'},override:'auto',escalate:true, fallback:false,grace:null}
     ];
   })(),
   phrases:[
@@ -786,9 +786,6 @@ function secBody(){
     </select>
     <p class="note" style="margin-top:8px">Anything older is tidied away on its own overnight. Photos go with it.</p>
 
-    <label class="f">Phone alerts (ntfy topic)</label>
-    <input id="sNtfy" value="${esc((CFG&&CFG.ntfy)||'')}" placeholder="karelynn-msgs-9x4f" autocapitalize="off" spellcheck="false">
-    <p class="note" style="margin-top:8px">Install the free ntfy app, subscribe to this exact topic, and her messages buzz your phone even when this app is closed. Leave blank to skip.</p>
     <button class="btn" style="margin-top:14px" id="saveName">Save</button>
   </div>`;
     case 'people': return `<div class="panel"><h3>People she can message</h3>
@@ -801,7 +798,7 @@ function secBody(){
     ${(CFG&&CFG.contacts||[]).map(c=>`
       <div class="trow"><div class="tico" style="border-radius:50%">${c.photo?`<img src="${c.photo}">`:icoHTML(c.icon)}</div>
       <div class="tmain"><div class="tname">${esc(c.name)}</div>
-        <div class="tsub">${careFree(c)?'available now':'not available now'}${c.fallback?' · always shown':''}${c.ntfy?'':' · no alerts set up'}</div></div>
+        <div class="tsub">${careFree(c)?'available now':'not available now'}${c.fallback?' · always shown':''}</div></div>
       <button class="tstat s-wait" data-econ="${c.id}">edit</button></div>`).join('')
       || '<div class="empty">No people yet. Add at least one so the Messages tab works on her tablet.</div>'}
     <button class="btn ghost" style="margin-top:14px" data-econ="new">+ Add a person</button>
@@ -820,7 +817,7 @@ function secBody(){
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-22-v</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-22-x</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1063,9 +1060,6 @@ function editContact(){
     </select>
     <p class="note" style="margin-top:8px">Shorten it for someone in the same room — if they haven't answered in two minutes they're probably asleep or out.</p>
 
-    <label class="f">Their ntfy topic</label>
-    <input id="dNtfy" value="${esc(c.ntfy||'')}" placeholder="nan-karelynn-4k2p" autocapitalize="off" spellcheck="false">
-    <p class="note" style="margin-top:8px">Their own topic in the free ntfy app. Messages she sends to this person buzz this topic. Make it long and random — anyone who guesses it can read along.</p>
     <button class="btn" style="margin-top:18px" id="dSave">Save person</button>
     ${c._new?'':`<button class="btn bad" style="margin-top:9px" id="dDel">Remove person</button>`}
     <button class="btn ghost" style="margin-top:9px" id="dCancel">Cancel</button>
@@ -1331,7 +1325,6 @@ document.addEventListener('click',async e=>{
   if(t.id==='saveName'){
     CFG=CFG||blank();
     CFG.name=document.getElementById('sName').value.trim();
-    CFG.ntfy=document.getElementById('sNtfy').value.trim();
     CFG.speechRate=parseFloat(document.getElementById('sRate').value);
     CFG.keepDays=+document.getElementById('sKeep').value||0;
     await saveConfig(t); return;
@@ -1426,10 +1419,10 @@ document.addEventListener('click',async e=>{
       const have=new Set((CFG&&CFG.contacts||[]).map(c=>c.name));
       const add=names.filter(n=>!have.has(n));
       document.getElementById('whoOut').textContent =
-        'Found: '+names.join(', ')+(add.length?' — adding '+add.length+' back now. You will still need their ntfy topics.':' — all already present.');
+        'Found: '+names.join(', ')+(add.length?' — adding '+add.length+' back now.':' — all already present.');
       if(add.length){
         CFG=CFG||blank(); CFG.contacts=CFG.contacts||[];
-        add.forEach(n=>CFG.contacts.push({id:uid(),name:n,icon:'👩',photo:null,ntfy:'',busy:{days:[],from:'08:00',to:'17:00'},override:'auto',escalate:true,fallback:false,grace:null}));
+        add.forEach(n=>CFG.contacts.push({id:uid(),name:n,icon:'👩',photo:null,busy:{days:[],from:'08:00',to:'17:00'},override:'auto',escalate:true,fallback:false,grace:null}));
         await saveConfig(); render();
       }
     }catch(e){ document.getElementById('whoOut').textContent='Could not check: '+e.message; }
@@ -1488,8 +1481,8 @@ document.addEventListener('click',async e=>{
     out.textContent='Sending…';
     try{
       const r=await post('/testpush',{});
-      const lines=(r.sent||[]).map(x=>x.topic+': '+(x.status===200?'delivered to ntfy':'failed, status '+x.status+(x.error?' '+x.error:'')));
-      out.textContent = lines.length ? lines.join('\n') + '\n\nIf ntfy says delivered but no notification arrived, the phone is not subscribed to that exact topic, or notifications are switched off for the ntfy app.' : 'Nothing was sent.';
+      const lines=(r.sent||[]).map(x=>x.name+': '+(x.status===201||x.status===200?'delivered':'failed, status '+x.status+(x.error?' '+x.error:'')));
+      out.textContent = lines.length ? lines.join('\n') + '\n\nIf it says delivered but no notification arrived, check that notifications are switched on for this app in the phone settings.' : 'Nothing was sent. Turn on notifications first.';
     }catch(e){ out.textContent = e.message; }
     return;
   }
@@ -1603,7 +1596,7 @@ document.addEventListener('click',async e=>{
   if(ec){
     CFG=CFG||blank();
     draft = ec.dataset.econ==='new'
-      ? {_new:true,id:uid(),name:'',icon:'👩',photo:null,ntfy:'',busyDays:[],override:'auto',escalate:true,fallback:false,grace:null}
+      ? {_new:true,id:uid(),name:'',icon:'👩',photo:null,busyDays:[],override:'auto',escalate:true,fallback:false,grace:null}
       : Object.assign({},CFG.contacts.find(x=>x.id===ec.dataset.econ));
     draft.busyDays=(draft.busy&&draft.busy.days)||[];
     sub='contact'; render(); return;
@@ -1807,7 +1800,6 @@ document.addEventListener('click',async e=>{
     if(sub==='contact'){
       const g=document.getElementById('dGrace').value;
       const rec={id:draft.id,name:val,icon:draft.icon,photo:draft.photo,
-        ntfy:(document.getElementById('dNtfy')||{}).value?.trim()||'',
         busy:{days:draft.busyDays||[],from:document.getElementById('dFrom').value||'08:00',to:document.getElementById('dTo').value||'17:00'},
         override:draft.override||'auto',
         escalate:draft.escalate!==false,
