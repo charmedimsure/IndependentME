@@ -1946,6 +1946,8 @@ document.addEventListener('click', e=>{
     lines.push('Worker set: '+(API||'none')+' / '+(HOUSE||'none'));
     lines.push('Connected: '+(online?'yes':'no'));
     lines.push('Tasks loaded: '+tasks().length);
+    lines.push('Native app: '+(window.Capacitor?'yes (Kare)':'no (browser)'));
+    lines.push('Native call token from app: '+(window.__gotNativeToken?'received':'not received'));
     const calls=(MSGS||[]).filter(m=>m.dir==='call');
     const last=calls[calls.length-1];
     lines.push('Call rows seen: '+calls.length+(last?(' — last to "'+(last.who||'(blank)')+'" '+Math.round((Date.now()-last.at)/1000)+'s ago'):''));
@@ -1959,6 +1961,11 @@ document.addEventListener('click', e=>{
             .then(sub=>'Push subscription: '+(sub?'yes':'NONE — tap Turn on notifications'))
             .catch(()=>'Push subscription: could not check')
         : Promise.resolve('Service worker: not supported'),
+      (API&&HOUSE)
+        ? fetch(API.replace(/\/$/,'')+'/fcm-status',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({house:HOUSE,person:'__tablet__'})})
+            .then(r=>r.json()).then(j=>'Call token on server: '+((j&&j.tokens>0)?('yes ('+j.tokens+')'):'NONE — calls cannot reach this tablet'))
+            .catch(()=>'Call token on server: could not check')
+        : Promise.resolve('Call token on server: not set up'),
       API ? fetch(API.replace(/\/$/,'')).then(r=>'Worker reachable: '+(r.ok?'yes':'HTTP '+r.status)).catch(()=>'Worker reachable: no')
           : Promise.resolve('Worker reachable: no address set')
     ]).then(extra=>{ out.textContent=lines.concat(extra).join('\n'); });
@@ -2040,12 +2047,13 @@ document.addEventListener('click', e=>{
    straight into that video call. */
 window.onKareFcmToken = function(token){
   try{
+    window.__gotNativeToken = !!token;
     if(!token || !API || !HOUSE) return;
     if(window.__fcmDone===token) return; window.__fcmDone=token;
     fetch(API.replace(/\/$/,'')+'/fcm-register',{
       method:'POST', headers:{'Content-Type':'application/json'},
       body:JSON.stringify({ house:HOUSE, care:'__tablet__', person:'__tablet__', token })
-    }).catch(()=>{});
+    }).then(r=>r.json()).then(j=>{ window.__fcmRegistered = !!(j&&j.ok); }).catch(()=>{ window.__fcmRegistered=false; });
   }catch(e){}
 };
 window.onKareAnswerCall = function(room){
@@ -2123,7 +2131,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-x';
+const APP_VERSION='2026-07-22-y';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
