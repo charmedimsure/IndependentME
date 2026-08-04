@@ -2045,17 +2045,28 @@ document.addEventListener('click', e=>{
    the worker so calls can ring over the lock screen. And when she taps Answer
    on the full-screen ring, the native side calls onKareAnswerCall to jump us
    straight into that video call. */
+window.__kareToken = null;
 window.onKareFcmToken = function(token){
+  window.__gotNativeToken = !!token;
+  if(token) window.__kareToken = token;
+  tryRegisterToken();
+};
+function tryRegisterToken(){
   try{
-    window.__gotNativeToken = !!token;
-    if(!token || !API || !HOUSE) return;
-    if(window.__fcmDone===token) return; window.__fcmDone=token;
+    var token = window.__kareToken;
+    if(!token || !API || !HOUSE) return;          // wait until we're connected
+    if(window.__fcmDone===token) return;           // already registered this token
     fetch(API.replace(/\/$/,'')+'/fcm-register',{
       method:'POST', headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({ house:HOUSE, care:'__tablet__', person:'__tablet__', token })
-    }).then(r=>r.json()).then(j=>{ window.__fcmRegistered = !!(j&&j.ok); }).catch(()=>{ window.__fcmRegistered=false; });
+      body:JSON.stringify({ house:HOUSE, care:'__tablet__', person:'__tablet__', token:token })
+    }).then(function(r){ return r.json(); }).then(function(j){
+      if(j && j.ok){ window.__fcmDone=token; window.__fcmRegistered=true; }
+    }).catch(function(){ window.__fcmRegistered=false; });
   }catch(e){}
-};
+}
+// Safety net: keep trying every few seconds until it sticks (covers the race
+// where the token arrives before the connection settings are loaded).
+setInterval(function(){ if(window.__kareToken && window.__fcmDone!==window.__kareToken) tryRegisterToken(); }, 4000);
 window.onKareAnswerCall = function(room){
   try{ if(room){ if(typeof startCall==='function'){ startCall(room,'b'); } } }catch(e){}
 };
@@ -2131,7 +2142,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-y';
+const APP_VERSION='2026-07-22-z';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
