@@ -475,8 +475,32 @@ const isRelaxed = () => (((CFG&&CFG.relaxedDays)||[]).includes(new Date().getDay
 const dueToday = t => t.freq==='daily' || (t.freq==='weekly' && (t.days||[]).includes(new Date().getDay())) || (t.freq==='once' && t.date===todayKey()) || carriedOver(t);
 
 /* ---------- voice and chime ---------- */
+function nativeTTS(){
+  return (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.TextToSpeech) || null;
+}
+function stopSpeaking(){
+  const t=nativeTTS();
+  if(t){ try{ t.stop(); }catch(e){} }
+  try{ if('speechSynthesis' in window) speechSynthesis.cancel(); }catch(e){}
+}
 function speak(text){
-  if(!SPEAK || !('speechSynthesis' in window) || !text) return;
+  if(!SPEAK || !text) return;
+  const tts=nativeTTS();
+  if(tts){
+    // Native Android speech engine (works inside the Kare app, where the
+    // browser's speech does not).
+    try{ tts.stop(); }catch(e){}
+    try{
+      tts.speak({
+        text:String(text),
+        lang:navigator.language||'en-US',
+        rate:(CFG&&CFG.speechRate)||0.9,
+        pitch:1.0, volume:1.0
+      });
+    }catch(e){}
+    return;
+  }
+  if(!('speechSynthesis' in window)) return;
   try{
     speechSynthesis.cancel();
     const u=new SpeechSynthesisUtterance(String(text));
@@ -485,7 +509,6 @@ function speak(text){
     const vs=speechSynthesis.getVoices();
     const v=vs.find(x=>x.lang && x.lang.startsWith((navigator.language||'en').slice(0,2)));
     if(v) u.voice=v;
-    // Chrome sometimes parks the queue; a resume nudges it awake
     speechSynthesis.resume();
     speechSynthesis.speak(u);
   }catch(e){}
@@ -1462,7 +1485,7 @@ function stopTimer(){
 function cancelTimer(){
   const t=timerTask;
   stopTimer();
-  try{ speechSynthesis.cancel(); }catch(e){}
+  stopSpeaking();
   speak('Stopped. You can start it again when you are ready.');
   // put it back in a few minutes rather than treating it as refused
   const k=todayKey()+'|'+t.id, s=SNOOZE[k]||{count:0,until:0};
@@ -1623,7 +1646,7 @@ function closeAlarm(){
   clearInterval(alarmTimer); alarmTimer=null;
   document.getElementById('alarm').classList.add('hide');
   try{ if(wakeLock){ wakeLock.release(); wakeLock=null; } }catch(e){}
-  try{ speechSynthesis.cancel(); }catch(e){}
+  stopSpeaking();
   alarmTask = null;
 }
 
@@ -1905,10 +1928,14 @@ document.addEventListener('click', e=>{
   if(t.id==='testVoice'){
     unlockAudio(); chime();
     const st=document.getElementById('voiceState');
-    if(!('speechSynthesis' in window)){ st.textContent='This tablet has no speech built in.'; return; }
-    const n=speechSynthesis.getVoices().length;
-    st.textContent = n ? n+' voices available. If you heard nothing, check the tablet volume and that Google Text-to-speech is installed in Settings.' 
-                       : 'No voices found. Install Google Text-to-speech from the Play Store, then Settings, Accessibility, Text-to-speech output.';
+    if(!nativeTTS() && !('speechSynthesis' in window)){ st.textContent='This tablet has no speech built in.'; return; }
+    if(nativeTTS()){
+      st.textContent='Using the tablet built-in speech. If you heard nothing, check the volume and that Google Text-to-speech is set in Settings.';
+    } else {
+      const n=speechSynthesis.getVoices().length;
+      st.textContent = n ? n+' voices available. If you heard nothing, check the tablet volume and that Google Text-to-speech is installed in Settings.'
+                         : 'No voices found. Install Google Text-to-speech from the Play Store, then Settings, Accessibility, Text-to-speech output.';
+    }
     speak('Hello Karelynn. This is how I will talk to you.');
     return;
   }
@@ -2142,7 +2169,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-22-z';
+const APP_VERSION='2026-07-23-a';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });
