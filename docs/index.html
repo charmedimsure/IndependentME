@@ -1974,7 +1974,11 @@ document.addEventListener('click', e=>{
     lines.push('Connected: '+(online?'yes':'no'));
     lines.push('Tasks loaded: '+tasks().length);
     lines.push('Native app: '+(window.Capacitor?'yes (Kare)':'no (browser)'));
+    var _pl = (window.Capacitor&&window.Capacitor.Plugins)?Object.keys(window.Capacitor.Plugins).join(', '):'(none)';
+    lines.push('Native plugins seen: '+_pl);
+    lines.push('Speech plugin: '+(nativeTTS()?'found':'MISSING (remote load)'));
     lines.push('Native call token from app: '+(window.__gotNativeToken?'received':'not received'));
+    lines.push('Token status from app: '+(window.__kareTokenStatus||'(none yet)'));
     const calls=(MSGS||[]).filter(m=>m.dir==='call');
     const last=calls[calls.length-1];
     lines.push('Call rows seen: '+calls.length+(last?(' — last to "'+(last.who||'(blank)')+'" '+Math.round((Date.now()-last.at)/1000)+'s ago'):''));
@@ -2169,7 +2173,7 @@ async function subscribeTabletPush(){
 }
 
 /* Android only offers "install" once; catch it and keep it for the setup panel. */
-const APP_VERSION='2026-07-23-a';
+const APP_VERSION='2026-07-23-d';
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; showInstallBar(); });
 window.addEventListener('appinstalled', ()=>{ document.getElementById('installbar').classList.add('hide'); });

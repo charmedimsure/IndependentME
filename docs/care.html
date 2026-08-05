@@ -815,9 +815,11 @@ function secBody(){
     <button class="btn ghost" id="askNotif">Turn on notifications</button>
     <button class="btn ghost" style="margin-top:10px" id="testPush">Send a test notification to everyone</button>
     <p class="note" id="pushOut" style="margin-top:10px;white-space:pre-wrap"></p>
+    <button class="btn ghost" style="margin-top:10px" id="testWake">Test: ring Karelynn's tablet</button>
+    <p class="note" id="wakeOut" style="margin-top:10px;white-space:pre-wrap"></p>
     <button class="btn ghost" style="margin-top:10px" id="installApp">Add to the home screen</button>
     <button class="btn ghost" style="margin-top:10px" id="forceUpdate">Get the newest version</button>
-    <p class="note" style="margin-top:10px">Version 2026-07-23-a</p>
+    <p class="note" style="margin-top:10px">Version 2026-07-23-d</p>
   </div>`;
     case 'advanced': return `<div class="panel"><h3>Connection</h3>
     <p class="note" style="margin-bottom:14px">Filled in by the link you were sent. You should not need to change any of it. Getting these wrong disconnects you from Karelynn.</p>
@@ -1474,6 +1476,19 @@ document.addEventListener('click',async e=>{
     CFG=local;
     try{ const r=await post('/config',{config:CFG,force:true}); savedAt=(r&&r.updated)||Date.now(); LS.set('savedAt',savedAt); loaded=true; toast('Uploaded'); render(); }
     catch(e){ alert(e.message); }
+    return;
+  }
+  if(t.id==='testWake'){
+    const out=document.getElementById('wakeOut');
+    out.textContent='Ringing the tablet…';
+    try{
+      const r=await post('/fcm-test',{person:'__tablet__'});
+      if(!r.tokens){ out.textContent='The tablet is not registered for calls yet (0 tokens on server). Open the Kare app on the tablet and let it sit connected.'; return; }
+      const oks=(r.results||[]).filter(x=>x.status===200).length;
+      const detail=(r.results||[]).map(x=>'status '+x.status+(x.error?(' '+x.error):(x.body&&x.status!==200?(' '+String(x.body).slice(0,120)):''))).join('\n');
+      out.textContent = 'Tokens on server: '+r.tokens+'\nGoogle accepted: '+oks+' of '+r.tokens+'\n'+detail+
+        '\n\nIf Google accepted it but the locked tablet did not ring, the tablet is blocking the wake-up (battery or full-screen setting). If Google did not accept, the token is stale.';
+    }catch(e){ out.textContent = e.message; }
     return;
   }
   if(t.id==='testPush'){
