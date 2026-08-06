@@ -31,42 +31,6 @@ const today = () => {
 };
 
 
-/* Push to one person's ntfy topic, or to everyone's. Best effort: a failed
-   push must never stop a message from being recorded. */
-/* HTTP headers can only carry Latin-1. An arrow or an em dash in the title
-   makes setting the header throw, which silently kills the whole push, so
-   everything going into a header gets flattened first. The body is UTF-8 and
-   can keep its accents and emoji. */
-const hdr = v => String(v == null ? '' : v)
-  .replace(/[\u2012-\u2015\u2212]/g, '-')
-  .replace(/[\u2018\u2019]/g, "'")
-  .replace(/[\u201C\u201D]/g, '"')
-  .replace(/\u2192/g, '>')
-  .replace(/\u2026/g, '...')
-  .replace(/[^\x20-\x7E]/g, '')
-  .slice(0, 200) || 'IndependentME';
-
-async function pushTo(topics, title, text, urgent) {
-  const list = [...new Set((topics || []).filter(Boolean))];
-  const results = await Promise.all(list.map(async topic => {
-    try {
-      const r = await fetch('https://ntfy.sh/' + encodeURIComponent(topic), {
-        method: 'POST',
-        headers: {
-          'Title': hdr(title),
-          'Tags': urgent ? 'sos' : 'speech_balloon',
-          'Priority': urgent ? 'urgent' : 'high',
-          'Content-Type': 'text/plain; charset=utf-8'
-        },
-        body: String(text == null ? '' : text)
-      });
-      return { topic, status: r.status };
-    } catch (e) {
-      return { topic, status: 0, error: String(e && e.message || e) };
-    }
-  }));
-  return results;
-}
 
 
 /* Local wall-clock for a household, so a 6pm task is judged at 6pm where she
@@ -239,8 +203,9 @@ async function fcmSend(env, deviceToken, data){
       }})
     });
     const body = await r.text();
-    if(r.status === 404 || r.status === 400){
-      // token dead: forget it
+    if(r.status === 404){
+      // 404 UNREGISTERED = token genuinely dead. Only then forget it.
+      // (A 400 is a message/config problem, NOT a dead token — never delete on 400.)
       await env.DB.prepare('DELETE FROM fcm_tokens WHERE code = ? AND token = ?').bind(data.__house || '', deviceToken).run().catch(()=>{});
     }
     return { status:r.status, body };
@@ -253,10 +218,12 @@ async function fcmTokensFor(env, house, person){
 // Ring a person's native app over the lock screen.
 async function fcmRing(env, house, person, caller, room){
   const tokens = await fcmTokensFor(env, house, person);
+  const results = [];
   for(const t of tokens){
-    await fcmSend(env, t, { type:'call', caller: String(caller||'Someone'), room: String(room||''), __house: house });
+    const r = await fcmSend(env, t, { type:'call', caller: String(caller||'Someone'), room: String(room||''), __house: house });
+    results.push(r);
   }
-  return tokens.length;
+  return { count: tokens.length, results };
 }
 
 async function ringTabletReminder(env, house, cfg, taskName){
@@ -301,9 +268,7 @@ function namesFor(cfg, who){
   return one ? [one.name] : [];
 }
 
-/* Notify people by name. Web Push if they have a subscription, otherwise
-   their ntfy topic, so nobody who hasn't migrated loses notifications and
-   nobody gets doubled up. Best effort. */
+/* Notify people by name over Web Push. Best effort. */
 async function notify(env, house, cfg, names, title, body, urgent){
   const results = [];
   for(const name of [...new Set(names.filter(Boolean))]){
@@ -317,24 +282,12 @@ async function notify(env, house, cfg, names, title, body, urgent){
           await env.DB.prepare('DELETE FROM push_subs WHERE code = ? AND endpoint = ?').bind(house, sub.endpoint).run();
         }
       }
-    } else {
-      const person = (cfg.contacts||[]).find(p => p.name === name);
-      const topic = person && person.ntfy;
-      if(topic){
-        const r = await pushTo([topic], title, body, urgent);
-        results.push({ name, via:'ntfy', status:(r[0]&&r[0].status)||0, error:r[0]&&r[0].error });
-      }
     }
   }
   return results;
 }
 
-const topicsFor = (cfg, name) => {
-  const people = cfg.contacts || [];
-  if (!name) return people.map(p => p.ntfy);
-  const one = people.find(p => p.name === name || p.id === name);
-  return one ? [one.ntfy] : people.map(p => p.ntfy);
-};
+
 
 export default {
   async fetch(request, env) {
@@ -581,6 +534,19 @@ export default {
         /* ---------- prove notifications work ---------- */
         /* ---------- the browser hands us its push subscription ---------- */
         /* ---------- native app registers its FCM token for calls ---------- */
+        case '/fcm-debug': {
+          if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
+          const mine = await env.DB.prepare('SELECT person, substr(token,1,12) AS tok, code, updated FROM fcm_tokens WHERE code = ?').bind(house).all();
+          const all = await env.DB.prepare('SELECT code, person, COUNT(*) AS n FROM fcm_tokens GROUP BY code, person').all();
+          return json({ ok:true, house, mine:(mine.results||[]), everything:(all.results||[]) });
+        }
+
+        case '/fcm-status': {
+          const person = body.person || (url.searchParams.get('person')) || '__tablet__';
+          const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM fcm_tokens WHERE code = ? AND person = ?').bind(house, person).first();
+          return json({ ok: true, person, tokens: (row && row.n) || 0 });
+        }
+
         case '/fcm-register': {
           const { person, token } = body;
           if(person !== '__tablet__' && !await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
@@ -595,8 +561,8 @@ export default {
         case '/fcm-test': {
           if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
           const cfgT = await loadConfig(env, house);
-          const n = await fcmRing(env, house, body.person || '__tablet__', (cfgT && cfgT.name) || 'Test', 'testroom');
-          return json({ ok: true, sentTo: n });
+          const out = await fcmRing(env, house, body.person || '__tablet__', (cfgT && cfgT.name) || 'Test', 'testroom');
+          return json({ ok: true, tokens: out.count, results: out.results });
         }
 
         case '/subscribe': {
@@ -884,11 +850,11 @@ export default {
         const ladder = (cfg.contacts || [])
           .filter(p => p.escalate !== false && p.name !== m.who)
           .filter(p => freeNow(p, now) || p.fallback)
-          .map(p => p.ntfy);
+          .map(p => p.name);
 
-        await pushTo(
-          ladder.length ? ladder : (cfg.contacts || []).filter(p => p.fallback).map(p => p.ntfy),
-          (cfg.name || 'IndependentME') + ' \u2014 still waiting',
+        const escTargets = ladder.length ? ladder : (cfg.contacts || []).filter(p => p.fallback).map(p => p.name);
+        await notify(env, h.code, cfg, escTargets,
+          (cfg.name || 'IndependentME') + ' - still waiting',
           'No answer from ' + (m.who || 'anyone') + '. ' + m.body,
           true
         );
