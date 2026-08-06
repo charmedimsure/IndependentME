@@ -537,8 +537,18 @@ export default {
         case '/fcm-debug': {
           if (!await careOk()) return json({ error: 'Wrong caregiver key' }, 403);
           const mine = await env.DB.prepare('SELECT person, substr(token,1,12) AS tok, code, updated FROM fcm_tokens WHERE code = ?').bind(house).all();
-          const all = await env.DB.prepare('SELECT code, person, COUNT(*) AS n FROM fcm_tokens GROUP BY code, person').all();
-          return json({ ok:true, house, mine:(mine.results||[]), everything:(all.results||[]) });
+          const email = env.FCM_CLIENT_EMAIL || '(not set)';
+          const key = env.FCM_PRIVATE_KEY || '';
+          const emailMasked = email === '(not set)' ? email : (email.slice(0, 22) + '...' + email.slice(-25));
+          let authTest;
+          try { const tok = await _fcmAccessToken(env); authTest = 'AUTH OK (token length ' + (tok ? tok.length : 0) + ')'; }
+          catch(e){ authTest = 'AUTH FAILED: ' + String(e && e.message || e); }
+          return json({ ok:true, house,
+            projectId: FCM_PROJECT_ID,
+            clientEmail: emailMasked,
+            keySet: key ? ('yes, ' + key.length + ' chars, starts ' + key.slice(0,27)) : 'NO',
+            authTest,
+            mine:(mine.results||[]) });
         }
 
         case '/fcm-status': {
